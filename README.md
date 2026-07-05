@@ -8,12 +8,10 @@ configuration: settings, custom skills, and npm dependency manifests.
 | Path | What |
 |------|------|
 | `agent/settings.json` | Default provider + model, theme, `packages[]` list |
-| `agent/trust.json` | Trusted-project absolute paths |
 | `agent/mcp-onboarding.json` | Onboarding flags |
 | `agent/skills/` | Custom skills: `idea-honing`, `plan-linked-review` |
 | `agent/npm/package.json` (+ lock) | pi npm extensions manifest (`context-mode`, `pi-mcp-adapter`) |
-| `bootstrap.sh` | One-command restore on a new machine (clone *or* reconcile) |
-| `restore.sh` | Post-checkout npm rebuild (called by `bootstrap.sh`) |
+| `bootstrap.sh` | One-command restore on a new machine |
 
 ### ⚠️ Caveat: npm manifests are force-added
 
@@ -29,6 +27,8 @@ Once a file is tracked, `.gitignore` cannot untrack it, so ordinary
 - **`agent/auth.json`** — ⚠️ live OAuth/API tokens. Never commit. Pi recreates
   this on first run via interactive login. A new machine's `auth.json` is left
   untouched by `bootstrap.sh`.
+- **`agent/trust.json`** — machine-specific trusted-project paths (absolute).
+  Kept local; each machine maintains its own. `bootstrap.sh` won't touch it.
 - **`agent/mcp-cache.json`** — regenerable MCP metadata cache.
 - **`agent/sessions/`** — per-project conversation history (large, machine-local).
 - **`agent/npm/node_modules/`** — rebuilt from `package.json` (~358 MB).
@@ -45,10 +45,10 @@ Project-scoped MCP servers (e.g. `stratz`, `docker-stratz` for the
 
 ## Restoring on a new machine
 
-The recommended path is `bootstrap.sh`, which handles all three starting
+`bootstrap.sh` is the **single** entry point. It handles all three starting
 states (missing dir, existing repo, or existing non-empty dir where pi already
-seeded defaults). Ignored files — including the new machine's `auth.json` —
-are never touched.
+seeded defaults), then rebuilds npm extensions. Ignored files — including the
+new machine's `auth.json` and `trust.json` — are never touched.
 
 ### Option A: curl-pipe (brand-new machine, after `git` + SSH key are set up)
 
@@ -61,7 +61,7 @@ bash -c "$(curl -fsSL \
 
 ```bash
 git clone git@github.com:aneviaro/pipack.git ~/.pi
-cd ~/.pi && ./restore.sh
+cd ~/.pi && ./bootstrap.sh
 ```
 
 ### Option C: `~/.pi` already exists (pi already ran once → `git clone` fails)
@@ -85,20 +85,12 @@ Prefer HTTPS instead of SSH? Override `PI_REMOTE`:
 PI_REMOTE=https://github.com/aneviaro/pipack.git bash bootstrap.sh
 ```
 
-### After checkout — finish up
+### After bootstrap — finish up
 
 ```bash
 pi   # fetches agent/bin/ + agent/git/ (from settings.json packages[])
      # and prompts for OAuth to (re)create agent/auth.json
 ```
-
-### ⚠️ Path-portability gotcha: `agent/trust.json`
-
-`trust.json` stores **absolute** paths from the source machine
-(e.g. `/Users/alex/Documents/moon-rhythm`). If your home directory differs on
-the new machine (e.g. `/Users/alexneverovskaya/...`), those entries won't
-resolve. Edit `agent/trust.json` after checkout to point at this machine's
-equivalent project, or remove stale entries.
 
 ## Going forward — keeping it in sync
 
@@ -109,12 +101,12 @@ cd ~/.pi && git add -A && git commit -m "update pi setup" && git push
 ```
 
 `git add -A` is always safe — the allowlist `.gitignore` means new files under
-`sessions/`, `node_modules/`, `context-mode/`, or a refreshed `auth.json` can
-never sneak in.
+`sessions/`, `node_modules/`, `context-mode/`, `trust.json`, or a refreshed
+`auth.json` can never sneak in.
 
 ## Policy reminder
 
 The `.gitignore` uses an **allowlist**: `*` ignores everything, then specific
 files are opted back in with `!` rules. To track a new file, add a `!/path` line
-to the OPT-INS section. **Never** allowlist `auth.json` or anything under
-`sessions/`, `node_modules/`, `bin/`, `git/`, or `context-mode/`.
+to the OPT-INS section. **Never** allowlist `auth.json`, `trust.json`, or
+anything under `sessions/`, `node_modules/`, `bin/`, `git/`, or `context-mode/`.
