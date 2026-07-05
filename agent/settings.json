@@ -1,0 +1,14 @@
+{
+  "lastChangelogVersion": "0.80.2",
+  "theme": "dark",
+  "defaultProvider": "zai",
+  "defaultModel": "glm-5.2",
+  "defaultThinkingLevel": "high",
+  "packages": [
+    "npm:pi-mcp-adapter",
+    "npm:context-mode",
+    "https://github.com/AvdLee/SwiftUI-Agent-Skill"
+  ],
+  "steeringMode": "one-at-a-time",
+  "hideThinkingBlock": false
+}

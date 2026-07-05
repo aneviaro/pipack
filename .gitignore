@@ -1,0 +1,57 @@
+# ============================================================
+# ~/.pi git backup — ALLOWLIST POLICY
+# ------------------------------------------------------------
+# Ignore EVERYTHING by default, then opt-in only safe files.
+# This protects secrets (auth.json holds live OAuth tokens) and
+# avoids tracking caches, session history, binaries, and DBs.
+#
+# To add a new file to the backup, add a "!/path/to/file" line
+# in the OPT-INS section below.
+# ============================================================
+
+# --- Step 1: ignore everything ---
+*
+
+# --- Step 2: let git descend into all directories ---
+# (directories themselves are un-ignored, but their FILES stay
+#  ignored unless explicitly allowed below)
+!*/
+
+# ============================================================
+# OPT-INS — only these are tracked
+# ============================================================
+
+# Repo metadata
+!/.gitignore
+!/README.md
+!/restore.sh
+
+# --- agent config (no secrets here) ---
+!/agent/settings.json
+!/agent/trust.json
+!/agent/mcp-onboarding.json
+
+# --- custom skills (whole trees) ---
+!/agent/skills/**
+
+# --- npm dependency manifests (NOT node_modules) ---
+# NOTE: agent/npm/.gitignore is pi-managed and contains "*", which (by
+# gitignore precedence) re-ignores these despite the rules below. They are
+# therefore force-added with `git add -f`. Once tracked, a file stays
+# tracked regardless of .gitignore, so `git add -A` keeps them updated
+# even if pi regenerates the nested ignore.
+!/agent/npm/package.json
+!/agent/npm/package-lock.json
+
+# ============================================================
+# EXPLICIT RE-IGNORES (redundant but documented for clarity)
+# These are already ignored by the leading "*"; lines below just
+# document WHY, so nobody is tempted to allowlist them.
+# ============================================================
+
+# agent/auth.json ........ live OAuth/API tokens — NEVER commit
+# agent/mcp-cache.json ... regenerable MCP metadata cache
+# agent/sessions/ ........ per-project conversation history
+# agent/bin/ ............. downloaded helper binaries (fd)
+# agent/git/ ............. re-cloned from settings.json packages[]
+# context-mode/ .......... SQLite DBs + per-pid session stats
