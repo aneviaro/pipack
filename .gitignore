@@ -24,6 +24,7 @@
 # Repo metadata
 !/.gitignore
 !/README.md
+!/bootstrap.sh
 !/restore.sh
 
 # --- agent config (no secrets here) ---
