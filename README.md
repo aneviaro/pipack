@@ -28,7 +28,9 @@ Once a file is tracked, `.gitignore` cannot untrack it, so ordinary
   this on first run via interactive login. A new machine's `auth.json` is left
   untouched by `bootstrap.sh`.
 - **`agent/trust.json`** — machine-specific trusted-project paths (absolute).
-  Kept local; each machine maintains its own. `bootstrap.sh` won't touch it.
+  Kept local; each machine maintains its own. `bootstrap.sh` preserves it
+  across the force checkout (backs up + restores), so it survives even on
+  machines migrating from an older commit where it was tracked.
 - **`agent/mcp-cache.json`** — regenerable MCP metadata cache.
 - **`agent/sessions/`** — per-project conversation history (large, machine-local).
 - **`agent/npm/node_modules/`** — rebuilt from `package.json` (~358 MB).

@@ -12,9 +12,13 @@
 #
 # Ignored files (agent/auth.json, agent/trust.json, sessions/,
 # context-mode/, node_modules/, bin/, git/) are NEVER touched — the new
-# machine keeps its own login, trusted paths, and history. Only tracked
-# files (settings.json, mcp-onboarding.json, skills/, npm manifests, the
-# two nested .gitignores) are overwritten by the force checkout.
+# machine keeps its own login, trusted paths, and history. This holds
+# even during the migration where trust.json goes from tracked (older
+# commits) to untracked (db8f17b+): bootstrap.sh backs it up across the
+# force checkout and restores it afterwards, so `checkout -f` can't
+# delete it on machines that cloned an older version. Only tracked files
+# (settings.json, mcp-onboarding.json, skills/, npm manifests, the two
+# nested .gitignores) are overwritten.
 #
 # Usage (from anywhere):
 #   PI_REMOTE=git@github.com:aneviaro/pipack.git bash bootstrap.sh
@@ -31,6 +35,20 @@ echo "    branch: $BRANCH"
 
 command -v git >/dev/null 2>&1 || { echo "!! git not found on PATH" >&2; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "!! npm not found on PATH" >&2; exit 1; }
+
+# --- Preserve machine-local trust.json across the force checkout --------
+# trust.json was tracked in older commits and untracked in db8f17b.
+# Without this guard, `checkout -f` deletes it on machines that cloned
+# an older version (tracked-in-old-HEAD, absent-in-new-HEAD), violating
+# the "ignored files are never touched" contract.
+#   - Older clone (trust.json tracked): backup -> checkout deletes -> restore.
+#   - Never tracked / fresh clone:      no backup, no restore (no-op).
+TRUST_BACKUP=""
+if [ -f "$PI_DIR/agent/trust.json" ]; then
+  TRUST_BACKUP="$(mktemp)"                   # portable: unique temp file in TMPDIR
+  cp -p "$PI_DIR/agent/trust.json" "$TRUST_BACKUP"
+  echo "    (preserving agent/trust.json across checkout)"
+fi
 
 # --- Step 1: get the repo onto disk -------------------------------------
 if [ -d "$PI_DIR/.git" ]; then
@@ -59,6 +77,16 @@ else
   git clone -b "$BRANCH" "$REMOTE" "$PI_DIR"
   cd "$PI_DIR"
 fi
+
+# --- Restore trust.json if the force checkout removed it ----------------
+# Happens on machines migrating from an older commit where it was tracked.
+# Where it was never tracked or the checkout left it alone, this is a no-op.
+if [ -n "$TRUST_BACKUP" ] && [ ! -f "$PI_DIR/agent/trust.json" ]; then
+  cp -p "$TRUST_BACKUP" "$PI_DIR/agent/trust.json"
+  echo "    (restored agent/trust.json after checkout)"
+fi
+[ -n "$TRUST_BACKUP" ] && rm -f "$TRUST_BACKUP"
+unset TRUST_BACKUP
 
 # --- Step 2: rebuild npm extensions from the manifest -------------------
 echo
