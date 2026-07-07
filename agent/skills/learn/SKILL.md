@@ -133,7 +133,7 @@ Keep each bullet concise and durable.
 
 ### 6. Ask for Confirmation
 
-Pi does not provide a dedicated multiple-choice question tool. Ask the user in chat and wait for their answer.
+Use `ask_user_question` to present the confirmation choices and wait for the user's answer. Do not ask in plain chat unless the tool is unavailable.
 
 Use granular choices:
 
@@ -144,21 +144,32 @@ Use granular choices:
 
 Example with multiple discoveries:
 
-```text
-Which knowledge should I save?
-1. All (3 items)
-2. Service discovery pattern → project AGENTS.md
-3. Local build runner convention → project AGENTS.md
-4. None
-Reply with a number or comma-separated item numbers.
+```json
+{
+  "question": "Which knowledge should I save?",
+  "options": [
+    { "label": "All (3 items)", "value": "all" },
+    { "label": "Service discovery pattern → project AGENTS.md", "value": "1" },
+    { "label": "Local build runner convention → project AGENTS.md", "value": "2" },
+    { "label": "None", "value": "none" }
+  ],
+  "allowFreeform": true,
+  "recommendation": "All"
+}
 ```
 
 Example with one discovery:
 
-```text
-Save this knowledge?
-1. Yes → project AGENTS.md
-2. No
+```json
+{
+  "question": "Save this knowledge?",
+  "options": [
+    { "label": "Yes → project AGENTS.md", "value": "yes" },
+    { "label": "No", "value": "no" }
+  ],
+  "allowFreeform": false,
+  "recommendation": "Yes"
+}
 ```
 
 After the user selection:

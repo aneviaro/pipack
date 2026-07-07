@@ -9,6 +9,10 @@ Convert a spec into a concrete implementation plan that an autonomous coding age
 
 The output is a saved Markdown plan, not only chat text.
 
+## User Input
+
+Use `ask_user_question` for any blocking missing input or product/contract decision. Ask one concise question, include likely options when useful, and provide a decisive `recommendation`. Do not ask in plain chat unless the tool is unavailable.
+
 ## Primary Goal
 
 Produce a plan with:
@@ -23,7 +27,7 @@ Produce a plan with:
 1. Identify the source spec and target plan path.
    - If the user names a spec file, use it.
    - If not, search likely locations: `docs/`, `docs/specs/`, `docs/implementation/`, `specs/`, `requirements/`, issues, or the current prompt.
-   - If no usable spec exists, ask for exactly one missing input: the spec location or spec text.
+   - If no usable spec exists, use `ask_user_question` to ask for exactly one missing input: the spec location or spec text.
 2. Read the full source spec.
 3. Inspect only the repository context needed to make the plan executable:
    - project guidance files (`AGENTS.md`, `CLAUDE.md`, `README.md`, package/build files);
@@ -32,7 +36,7 @@ Produce a plan with:
 4. Determine the implementation path.
    - Prefer the smallest coherent sequence that preserves existing conventions.
    - If the spec is ambiguous, make a reasonable assumption and record it in the plan.
-   - Ask only when a product/contract decision blocks planning.
+   - Use `ask_user_question` only when a product/contract decision blocks planning.
 5. Write or update a Markdown plan.
 6. Confirm the plan is Ralphex-compatible by checking that it contains at least one executable task heading matching exactly:
    - `### Task 1: <title>`

@@ -1,6 +1,6 @@
 ---
 name: plan-linked-review
-description: Review current local changes for correctness, quality, and best practices against a required implementation plan link or path. Use when asked to review local changes, diffs, or implementation progress against a plan/spec step. If no plan link/path is provided, ask for it before reviewing.
+description: Review current local changes for correctness, quality, and best practices against a required implementation plan link or path. Use when asked to review local changes, diffs, or implementation progress against a plan/spec step. If no plan link/path is provided, use ask_user_question before reviewing.
 ---
 
 # Plan-Linked Review
@@ -15,9 +15,15 @@ A plan link or path is mandatory, for example:
 - `docs/plans/some-plan.md`
 - a URL to a plan/spec document
 
-If the user asks for this review without a plan link/path, stop and ask:
+If the user asks for this review without a plan link/path, stop and call `ask_user_question`:
 
-> Please provide the plan link or path to review these changes against.
+```json
+{
+  "question": "Please provide the plan link or path to review these changes against.",
+  "allowFreeform": true,
+  "recommendation": "Paste the docs/plans/... path or URL for the implementation plan."
+}
+```
 
 Do not infer the plan from recent context unless the user explicitly named it in the current request.
 

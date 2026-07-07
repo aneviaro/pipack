@@ -7,18 +7,23 @@ description: Relentlessly interview the user to sharpen a vague idea into an act
 
 Turn an idea into a saved, implementation-ready spec through a focused interrogation loop.
 
+## User Input
+
+Use `ask_user_question` for every blocking question in the interrogation loop. Pass one concise `question`, likely `options` when useful, `allowFreeform`, and a decisive `recommendation`. Do not ask in plain chat unless the tool is unavailable.
+
 ## Workflow
 
-1. Identify the idea, target product area, and desired output. If the user has not provided enough to start, ask for the one missing seed detail.
+1. Identify the idea, target product area, and desired output. If the user has not provided enough to start, use `ask_user_question` for the one missing seed detail.
 2. Interview the user relentlessly, one question at a time, until the spec is unambiguous enough to implement.
 3. For every question:
+   - Call `ask_user_question` exactly once.
    - Ask exactly one question.
-   - Include your recommended answer after the question.
+   - Include your recommended answer in the tool's `recommendation` field.
    - Prefer decisive defaults over open-ended brainstorming.
    - If the answer can be discovered from the repository, inspect the code/docs instead of asking.
 4. Resolve dependencies between decisions in order. Do not jump ahead to low-level details before core constraints are settled.
 5. Keep a running mental spec and update it after each answer.
-6. When enough decisions are resolved, tell the user you are ready to write the spec and ask for confirmation only if there is a meaningful unresolved product choice. Otherwise proceed.
+6. When enough decisions are resolved, tell the user you are ready to write the spec and use `ask_user_question` for confirmation only if there is a meaningful unresolved product choice. Otherwise proceed.
 7. Save the spec as markdown in the repository.
 8. Report the created file path and any remaining open questions.
 
@@ -122,7 +127,7 @@ Owner: TBD
 ## Behavior Rules
 
 - Be direct and skeptical.
-- Ask one question at a time.
+- Ask one question at a time via `ask_user_question`.
 - Each question must include a recommended answer.
 - Do not produce the final spec until the important branches are resolved.
 - Do not ask questions that repository inspection can answer.
