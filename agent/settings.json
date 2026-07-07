@@ -1,13 +1,14 @@
 {
   "lastChangelogVersion": "0.80.2",
-  "theme": "dark",
+  "theme": "catppuccin-frappe",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:context-mode",
-    "https://github.com/AvdLee/SwiftUI-Agent-Skill"
+    "https://github.com/AvdLee/SwiftUI-Agent-Skill",
+    "git:https://github.com/hasit/pi-community-themes"
   ],
   "steeringMode": "one-at-a-time",
   "hideThinkingBlock": false
