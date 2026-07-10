@@ -12,6 +12,7 @@ configuration: settings, custom skills, and npm dependency manifests.
 | `agent/skills/` | Custom skills |
 | `agent/npm/package.json` (+ lock) | pi npm extensions manifest |
 | `packages/ask-user-question/` | Publishable `ask_user_question` Pi package |
+| `packages/codex-limit-tracking-footer/` | Publishable Codex limit footer Pi package |
 | `bootstrap.sh` | One-command restore on a new machine |
 
 ## Included Pi packages
@@ -21,6 +22,14 @@ configuration: settings, custom skills, and npm dependency manifests.
 A blocking clarification tool with multiple-choice and freeform answers.
 
 ![ask_user_question presents a recommended multiple-choice prompt in Pi](packages/ask-user-question/assets/ask-user-question-demo.png)
+
+### `@aneviaro/pi-codex-limit-tracking-footer`
+
+Adds an unprefixed 5-hour/weekly Codex subscription-limit segment to Pi's footer, with semantic colors, stale-data handling, and `/codex-limits [refresh]` diagnostics. It uses Pi-managed OAuth credentials without persisting usage data.
+
+```bash
+pi install npm:@aneviaro/pi-codex-limit-tracking-footer@0.1.0
+```
 
 ## What's deliberately NOT tracked (see `.gitignore`)
 

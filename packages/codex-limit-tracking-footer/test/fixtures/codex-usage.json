@@ -1,0 +1,15 @@
+{
+  "email": "fixture-user@example.test",
+  "rate_limit": {
+    "primary_window": {
+      "used_percent": 58,
+      "limit_window_seconds": 18000,
+      "reset_at": 4102444800
+    },
+    "secondary_window": {
+      "used_percent": 19,
+      "limit_window_seconds": 604800,
+      "reset_at": 4106044800
+    }
+  }
+}

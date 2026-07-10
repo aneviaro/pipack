@@ -29,6 +29,7 @@ export type LimitTracker = {
 
 export const CACHE_TTL_MS = 15_000;
 export const REFRESH_INTERVAL_MS = 60_000;
+export const CODEX_FETCH_TIMEOUT_MS = 15_000;
 export const LIMIT_STATUS_KEY = "codex-limits";
 export const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 export const CODEX_LIMITS_REFRESH_ARG = "refresh";
@@ -79,6 +80,10 @@ export function findTracker(provider: string | undefined): LimitTracker | undefi
 		if (tracker.matchesProvider(provider)) return tracker;
 	}
 	return undefined;
+}
+
+export function getTrackerCacheKey(trackerId: string, providerId: string | undefined): string {
+	return `${trackerId}:${providerId ?? ""}`;
 }
 
 export function createLimitTrackingState(): LimitTrackingState {
@@ -510,15 +515,6 @@ function createCodexHeaders(authHeaders: Record<string, string> | undefined, tok
 	return headers;
 }
 
-function summarizeCodexErrorBody(body: string, contentType: string | null): string {
-	const text = body.trim();
-	if (!text) return "empty response body";
-	if ((contentType || "").includes("text/html") || /^<!doctype html>|^<html\b/i.test(text)) {
-		return "HTML error page";
-	}
-	return text.replace(/\s+/g, " ").slice(0, 300);
-}
-
 // User-visible diagnostics must stay sanitized: never include tokens, account IDs, or raw headers.
 export function sanitizeCodexError(error: unknown, secrets: string[] = []): string {
 	const raw = error instanceof Error ? error.message : String(error);
@@ -535,18 +531,33 @@ export function sanitizeCodexError(error: unknown, secrets: string[] = []): stri
 	return text.slice(0, 500);
 }
 
-export async function fetchCodexUsage(headers: Headers): Promise<unknown> {
-	const response = await fetch(CODEX_USAGE_URL, { method: "GET", headers });
-	const text = await response.text();
-	if (!response.ok) {
-		const body = summarizeCodexErrorBody(text, response.headers.get("content-type"));
-		throw new Error(`Codex usage request failed (${response.status}): ${body || response.statusText}`);
-	}
-	if (!text.trim()) throw new Error("Codex usage response was empty");
+export async function fetchCodexUsage(
+	headers: Headers,
+	options: { timeoutMs?: number; signal?: AbortSignal } = {},
+): Promise<unknown> {
+	const controller = new AbortController();
+	const timeoutMs = options.timeoutMs ?? CODEX_FETCH_TIMEOUT_MS;
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	const onAbort = () => controller.abort();
+	options.signal?.addEventListener("abort", onAbort, { once: true });
+
 	try {
-		return JSON.parse(text) as unknown;
-	} catch {
-		throw new Error("Codex usage response was not valid JSON");
+		const response = await fetch(CODEX_USAGE_URL, { method: "GET", headers, signal: controller.signal });
+		if (!response.ok) throw new Error(`Codex usage request failed (${response.status})`);
+
+		const text = await response.text();
+		if (!text.trim()) throw new Error("Codex usage response was empty");
+		try {
+			return JSON.parse(text) as unknown;
+		} catch {
+			throw new Error("Codex usage response was not valid JSON");
+		}
+	} catch (error) {
+		if (controller.signal.aborted) throw new Error("Codex usage request timed out");
+		throw error;
+	} finally {
+		clearTimeout(timer);
+		options.signal?.removeEventListener("abort", onAbort);
 	}
 }
 
@@ -579,7 +590,7 @@ export const codexTracker: LimitTracker = {
 			}
 
 			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-			if (!auth.ok) throw new Error(auth.error || "Pi could not resolve Codex credentials");
+			if (!auth.ok) throw new Error("Pi could not resolve Codex credentials");
 
 			const token = auth.apiKey?.replace(/^Bearer\s+/i, "").trim() || extractBearerToken(auth.headers);
 			if (!token) throw new Error("Pi could not resolve a Codex OAuth access token");
@@ -662,9 +673,10 @@ function getCodexDetailLevel(
 function buildCodexLimitDetails(ctx: ExtensionContext, state: LimitTrackingState, now = Date.now()) {
 	const provider = ctx.model?.provider ?? "none";
 	const providerMatch = codexTracker.matchesProvider(provider);
-	const snapshot = state.snapshotByTracker.get(codexTracker.id);
-	const lastError = snapshot?.error ?? state.lastErrorByTracker.get(codexTracker.id);
-	const lastAttempt = state.lastAttemptByTracker.get(codexTracker.id);
+	const cacheKey = providerMatch ? getTrackerCacheKey(codexTracker.id, provider) : undefined;
+	const snapshot = cacheKey ? state.snapshotByTracker.get(cacheKey) : undefined;
+	const lastError = snapshot?.error ?? (cacheKey ? state.lastErrorByTracker.get(cacheKey) : undefined);
+	const lastAttempt = cacheKey ? state.lastAttemptByTracker.get(cacheKey) : undefined;
 	const lines = [
 		"Codex subscription limit status",
 		`Model: ${ctx.model?.id ?? "none"}`,
@@ -715,7 +727,8 @@ export default function limitTrackingFooter(pi: ExtensionAPI) {
 			clearFooterStatus(ctx);
 			return;
 		}
-		renderFooterStatus(ctx, state.snapshotByTracker.get(state.activeTracker.id));
+		const cacheKey = getTrackerCacheKey(state.activeTracker.id, state.activeProvider);
+		renderFooterStatus(ctx, state.snapshotByTracker.get(cacheKey));
 	};
 
 	const refreshForCurrentModel = async (
@@ -726,50 +739,53 @@ export default function limitTrackingFooter(pi: ExtensionAPI) {
 
 		syncActiveTracker(ctx.model?.provider);
 		const tracker = state.activeTracker;
-		if (!tracker) {
+		const providerId = state.activeProvider;
+		if (!tracker || !providerId) {
 			clearFooterStatus(ctx);
 			return null;
 		}
+		const cacheKey = getTrackerCacheKey(tracker.id, providerId);
 
-		const previousSnapshot = state.snapshotByTracker.get(tracker.id);
-		const lastAttempt = state.lastAttemptByTracker.get(tracker.id) ?? 0;
+		const previousSnapshot = state.snapshotByTracker.get(cacheKey);
+		const lastAttempt = state.lastAttemptByTracker.get(cacheKey) ?? 0;
 		if (!options.force && Date.now() - lastAttempt < CACHE_TTL_MS) {
 			renderCurrentStatus(ctx);
 			return previousSnapshot ?? null;
 		}
 
-		const inFlight = state.inFlightRefresh.get(tracker.id);
+		const inFlight = state.inFlightRefresh.get(cacheKey);
 		if (inFlight) return inFlight;
 
 		const refreshPromise = (async () => {
-			state.lastAttemptByTracker.set(tracker.id, Date.now());
+			state.lastAttemptByTracker.set(cacheKey, Date.now());
 
 			const nextSnapshot = await tracker.fetchSnapshot(ctx, { force: options.force });
-			if (hasRenderableSnapshot(nextSnapshot) && !nextSnapshot.error) {
-				state.snapshotByTracker.set(tracker.id, { ...nextSnapshot, stale: false });
-				state.lastErrorByTracker.delete(tracker.id);
-				if (state.sessionActive && state.activeTracker?.id === tracker.id) renderCurrentStatus(ctx);
+			const sameProvider = nextSnapshot.providerId === providerId;
+			if (sameProvider && hasRenderableSnapshot(nextSnapshot) && !nextSnapshot.error) {
+				state.snapshotByTracker.set(cacheKey, { ...nextSnapshot, stale: false });
+				state.lastErrorByTracker.delete(cacheKey);
+				if (state.sessionActive) renderCurrentStatus(ctx);
 				return nextSnapshot;
 			}
 
-			const failure = nextSnapshot.error ?? "Unable to refresh limit status";
-			state.lastErrorByTracker.set(tracker.id, failure);
+			const failure = sameProvider ? nextSnapshot.error ?? "Unable to refresh limit status" : "Limit response provider did not match the active provider";
+			state.lastErrorByTracker.set(cacheKey, failure);
 
 			if (hasRenderableSnapshot(previousSnapshot)) {
 				const staleSnapshot: LimitSnapshot = { ...previousSnapshot, stale: true, error: failure };
-				state.snapshotByTracker.set(tracker.id, staleSnapshot);
-				if (state.sessionActive && state.activeTracker?.id === tracker.id) renderCurrentStatus(ctx);
+				state.snapshotByTracker.set(cacheKey, staleSnapshot);
+				if (state.sessionActive) renderCurrentStatus(ctx);
 				return staleSnapshot;
 			}
 
-			state.snapshotByTracker.delete(tracker.id);
-			if (state.sessionActive && state.activeTracker?.id === tracker.id) clearFooterStatus(ctx);
+			state.snapshotByTracker.delete(cacheKey);
+			if (state.sessionActive) clearFooterStatus(ctx);
 			return null;
 		})().finally(() => {
-			state.inFlightRefresh.delete(tracker.id);
+			state.inFlightRefresh.delete(cacheKey);
 		});
 
-		state.inFlightRefresh.set(tracker.id, refreshPromise);
+		state.inFlightRefresh.set(cacheKey, refreshPromise);
 		return refreshPromise;
 	};
 
@@ -822,9 +838,7 @@ export default function limitTrackingFooter(pi: ExtensionAPI) {
 	});
 
 	pi.on("turn_end", async (_event, ctx) => {
-		// Codex usage windows update after model turns, so bypass the polling TTL here.
 		await refreshForCurrentModel(ctx, { force: true, reason: "turn_end" });
-		renderCurrentStatus(ctx);
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {

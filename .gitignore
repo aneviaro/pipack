@@ -38,6 +38,19 @@
 
 # --- locally developed Pi packages ---
 !/packages/ask-user-question/**
+!/packages/codex-limit-tracking-footer/
+!/packages/codex-limit-tracking-footer/LICENSE
+!/packages/codex-limit-tracking-footer/README.md
+!/packages/codex-limit-tracking-footer/assets/
+!/packages/codex-limit-tracking-footer/assets/**
+!/packages/codex-limit-tracking-footer/package.json
+!/packages/codex-limit-tracking-footer/package-lock.json
+!/packages/codex-limit-tracking-footer/tsconfig.json
+!/packages/codex-limit-tracking-footer/extensions/
+!/packages/codex-limit-tracking-footer/extensions/**
+!/packages/codex-limit-tracking-footer/test/
+!/packages/codex-limit-tracking-footer/test/**
+/packages/codex-limit-tracking-footer/node_modules/
 
 # --- npm dependency manifests (NOT node_modules) ---
 # NOTE: agent/npm/.gitignore is pi-managed and contains "*", which (by

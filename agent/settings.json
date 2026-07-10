@@ -2,13 +2,16 @@
   "lastChangelogVersion": "0.80.6",
   "theme": "catppuccin-frappe",
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-luna",
+  "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:context-mode",
     "https://github.com/AvdLee/SwiftUI-Agent-Skill",
-    "git:https://github.com/hasit/pi-community-themes"
+    "git:https://github.com/hasit/pi-community-themes",
+    "../packages/ask-user-question",
+    "../packages/codex-limit-tracking-footer",
+    "https://github.com/umputun/revdiff"
   ],
   "steeringMode": "one-at-a-time",
   "hideThinkingBlock": false,
