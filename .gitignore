@@ -36,6 +36,9 @@
 # --- custom extensions ---
 !/agent/extensions/**
 
+# --- locally developed Pi packages ---
+!/packages/ask-user-question/**
+
 # --- npm dependency manifests (NOT node_modules) ---
 # NOTE: agent/npm/.gitignore is pi-managed and contains "*", which (by
 # gitignore precedence) re-ignores these despite the rules below. They are

@@ -11,7 +11,16 @@ configuration: settings, custom skills, and npm dependency manifests.
 | `agent/mcp-onboarding.json` | Onboarding flags |
 | `agent/skills/` | Custom skills |
 | `agent/npm/package.json` (+ lock) | pi npm extensions manifest |
+| `packages/ask-user-question/` | Publishable `ask_user_question` Pi package |
 | `bootstrap.sh` | One-command restore on a new machine |
+
+## Included Pi packages
+
+### `@aneviaro/pi-ask-user-question`
+
+A blocking clarification tool with multiple-choice and freeform answers.
+
+![ask_user_question presents a recommended multiple-choice prompt in Pi](packages/ask-user-question/assets/ask-user-question-demo.png)
 
 ## What's deliberately NOT tracked (see `.gitignore`)
 
