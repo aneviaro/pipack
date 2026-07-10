@@ -11,5 +11,10 @@
     "git:https://github.com/hasit/pi-community-themes"
   ],
   "steeringMode": "one-at-a-time",
-  "hideThinkingBlock": false
+  "hideThinkingBlock": false,
+  "enabledModels": [
+    "zai/glm-5.2",
+    "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.5"
+  ]
 }
