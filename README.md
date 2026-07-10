@@ -23,12 +23,18 @@ A blocking clarification tool with multiple-choice and freeform answers.
 
 ![ask_user_question presents a recommended multiple-choice prompt in Pi](packages/ask-user-question/assets/ask-user-question-demo.png)
 
+```bash
+pi install npm:@aneviaro/pi-ask-user-question
+```
+
 ### `@aneviaro/pi-codex-limit-tracking-footer`
 
-Adds an unprefixed 5-hour/weekly Codex subscription-limit segment to Pi's footer, with semantic colors, stale-data handling, and `/codex-limits [refresh]` diagnostics. It uses Pi-managed OAuth credentials without persisting usage data.
+Adds a 5-hour/weekly Codex subscription-limit segment to Pi's footer, with semantic colors, stale-data handling, and `/codex-limits [refresh]` diagnostics. It uses Pi-managed OAuth credentials without persisting usage data.
+
+![codex-limit-tracking-footer shows current subscription limits](packages/codex-limit-tracking-footer/assets/codex-limit-tracking-footer.png)
 
 ```bash
-pi install npm:@aneviaro/pi-codex-limit-tracking-footer@0.1.0
+pi install npm:@aneviaro/pi-codex-limit-tracking-footer
 ```
 
 ## What's deliberately NOT tracked (see `.gitignore`)
