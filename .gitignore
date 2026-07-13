@@ -25,6 +25,7 @@
 !/.gitignore
 !/README.md
 !/bootstrap.sh
+!/docs/pi-safe-rm-spec.md
 
 # --- agent config (no secrets here) ---
 !/agent/settings.json
