@@ -25,7 +25,8 @@ Use `ask_user_question` for every blocking question in the interrogation loop. P
 5. Keep a running mental spec and update it after each answer.
 6. When enough decisions are resolved, tell the user you are ready to write the spec and use `ask_user_question` for confirmation only if there is a meaningful unresolved product choice. Otherwise proceed.
 7. Save the spec as markdown in the repository.
-8. Report the created file path and any remaining open questions.
+8. Run the `revdiff` skill against the saved spec (`--only <spec-path>`; add `--untracked` for a new file). Process captured annotations and update the spec when needed.
+9. Report the created file path and any remaining open questions.
 
 ## Question Order
 
@@ -114,10 +115,6 @@ Owner: TBD
 ## Test Plan
 
 - <Verification step>
-
-## Implementation Plan
-
-1. <Step>
 
 ## Open Questions
 

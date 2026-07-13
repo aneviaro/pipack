@@ -42,7 +42,8 @@ Produce a plan with:
    - `### Task 1: <title>`
    - `### Task 2: <title>`
    - or `### Iteration 1: <title>`
-7. Report the saved file path and no more than three important caveats.
+7. Run the `revdiff` skill against the saved plan (`--only <plan-path>`; add `--untracked` for a new file). Process captured annotations and update the plan when needed.
+8. Report the saved file path and no more than three important caveats.
 
 ## Default Plan Location
 
@@ -51,10 +52,6 @@ Use the first matching convention:
 1. Existing project plan convention if obvious.
 2. `docs/plans/YYYYMMDD-<kebab-case-title>.md`.
 3. `docs/implementation-plan.md` if the repository already uses a single rolling implementation plan.
-4. `implementation-plan.md` if no docs directory exists.
-
-Create directories as needed. If a related plan already exists, update it instead of creating a duplicate.
-
 ## Ralphex Compatibility Rules
 
 Ralphex task execution requires executable sections. The plan must include task headings in this form:
