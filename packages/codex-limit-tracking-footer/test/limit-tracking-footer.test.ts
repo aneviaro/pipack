@@ -81,7 +81,7 @@ test("normalizes the documented Codex fixture and reset timestamps", () => {
 	assert.equal(snapshot.windows[0]?.resetAt, 4_102_444_800_000);
 });
 
-test("discovers fallback windows and rejects incomplete payloads", () => {
+test("discovers fallback windows, accepts weekly-only payloads, and rejects incomplete payloads", () => {
 	const fallback = {
 		limits: [
 			{ name: "rolling 5 hour", used: 2, limit: 4 },
@@ -90,7 +90,29 @@ test("discovers fallback windows and rejects incomplete payloads", () => {
 	};
 	const snapshot = normalizeCodexUsageResponse(fallback, "openai-codex", undefined, 1_700_000_000_000);
 	assert.deepEqual(snapshot.windows.map((window) => window.remainingPercent), [50, 81]);
-	assert.throws(() => normalizeCodexUsageResponse({ rate_limit: { primary_window: { used_percent: 1 } } }));
+
+	const weeklyOnly = {
+		email: "fixture-user@example.test",
+		rate_limit: {
+			primary_window: {
+				used_percent: 1,
+				limit_window_seconds: 604_800,
+				reset_after_seconds: 603_715,
+				reset_at: 1_784_554_739,
+			},
+			secondary_window: null,
+		},
+	};
+	const weeklySnapshot = normalizeCodexUsageResponse(weeklyOnly, "openai-codex", undefined, 1_700_000_000_000);
+	assert.equal(weeklySnapshot.accountLabel, "fixture-user@example.test");
+	assert.deepEqual(weeklySnapshot.windows.map(({ id, remainingPercent, usedPercent }) => ({ id, remainingPercent, usedPercent })), [
+		{ id: "7d", remainingPercent: 99, usedPercent: 1 },
+	]);
+
+	assert.throws(
+		() => normalizeCodexUsageResponse({ rate_limit: { primary_window: { used_percent: 1 } } }),
+		/recognizable limit windows/,
+	);
 });
 
 test("uses the specified threshold buckets and renders an unprefixed stale footer", () => {

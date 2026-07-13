@@ -24,13 +24,13 @@ The package supports Pi 0.80.6+ and Node.js 20+.
 
 ## Behavior
 
-For an active Pi-managed `openai-codex` model, the footer shows both the 5-hour and weekly windows, for example:
+For an active Pi-managed `openai-codex` model, the footer shows the Codex limit windows returned for the account, for example:
 
 ```text
 5h 42% left · 7d 81% left
 ```
 
-Each window is themed independently: above 50% is success, 20–50% is warning, and below 20% is error. Failed refreshes retain same-provider data with a stale age marker. Data is refreshed at startup, on provider/model changes, after each completed turn, and no more than once per 15 seconds per provider; background polling runs every minute.
+Some accounts currently expose only the weekly window, which renders as `7d 99% left`. Each window is themed independently: above 50% is success, 20–50% is warning, and below 20% is error. Failed refreshes retain same-provider data with a stale age marker. Data is refreshed at startup, on provider/model changes, after each completed turn, and no more than once per 15 seconds per provider; background polling runs every minute.
 
 Use `/codex-limits` for details, or `/codex-limits refresh` to bypass the cache for a manual refresh.
 

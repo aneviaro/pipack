@@ -366,24 +366,49 @@ function candidateFromRecord(record: UnknownRecord, path: string, now: number): 
 	return { window, score };
 }
 
+function sortCodexWindows(windows: LimitWindow[]): LimitWindow[] {
+	const order = new Map<string, number>([["5h", 0], ["7d", 1]]);
+	return [...windows].sort((left, right) => (order.get(left.id) ?? 99) - (order.get(right.id) ?? 99));
+}
+
+function dedupeCodexWindows(windows: LimitWindow[]): LimitWindow[] {
+	const byId = new Map<string, LimitWindow>();
+	for (const window of windows) {
+		if (!byId.has(window.id)) byId.set(window.id, window);
+	}
+	return sortCodexWindows([...byId.values()]);
+}
+
+function responseAccountLabel(raw: UnknownRecord | undefined, fallback: string | undefined): string | undefined {
+	const value = typeof raw?.email === "string" ? raw.email.trim() : "";
+	return value || fallback;
+}
+
 // Endpoint/schema assumption: /wham/usage returns rate_limit.primary_window and
 // rate_limit.secondary_window objects with used_percent, limit_window_seconds, and reset_at.
+// Some accounts currently receive only a weekly primary_window with secondary_window null.
 export function normalizeCodexUsageResponse(payload: unknown, providerId = "openai-codex", accountLabel?: string, now = Date.now()): LimitSnapshot {
 	const raw = isRecord(payload) ? payload : undefined;
 	const rateLimit = raw ? getRecordValue(raw, ["rateLimit", "rate_limit"]) : undefined;
 	const rateLimitRecord = isRecord(rateLimit) ? rateLimit : undefined;
 	const primaryWindow = rateLimitRecord ? getRecordValue(rateLimitRecord, ["primaryWindow", "primary_window"]) : undefined;
 	const secondaryWindow = rateLimitRecord ? getRecordValue(rateLimitRecord, ["secondaryWindow", "secondary_window"]) : undefined;
-	const primary = isRecord(primaryWindow) ? normalizeCodexRateLimitWindow(primaryWindow, "5h", now) : undefined;
-	const secondary = isRecord(secondaryWindow) ? normalizeCodexRateLimitWindow(secondaryWindow, "7d", now) : undefined;
+	const primaryRecord = isRecord(primaryWindow) ? primaryWindow : undefined;
+	const secondaryRecord = isRecord(secondaryWindow) ? secondaryWindow : undefined;
+	const primary = primaryRecord ? normalizeCodexRateLimitWindow(primaryRecord, "5h", now) : undefined;
+	const secondary = secondaryRecord ? normalizeCodexRateLimitWindow(secondaryRecord, "7d", now) : undefined;
 	const explicitWindows = [primary, secondary].filter((window): window is LimitWindow => Boolean(window));
-	if (explicitWindows.length === 2) {
-		const responseAccountLabel = typeof raw?.email === "string" ? raw.email.trim() || undefined : undefined;
+	const identifiedExplicitWindows = [
+		primaryRecord && windowIdFromDescriptor(primaryRecord, "rate_limit.primary_window", now) ? primary : undefined,
+		secondaryRecord && windowIdFromDescriptor(secondaryRecord, "rate_limit.secondary_window", now) ? secondary : undefined,
+	].filter((window): window is LimitWindow => Boolean(window));
+	if (explicitWindows.length === 2 || identifiedExplicitWindows.length > 0) {
+		const windows = explicitWindows.length === 2 ? explicitWindows : identifiedExplicitWindows;
 		return {
 			providerId,
 			providerLabel: "Codex",
-			...((responseAccountLabel ?? accountLabel) ? { accountLabel: responseAccountLabel ?? accountLabel } : {}),
-			windows: explicitWindows,
+			...(responseAccountLabel(raw, accountLabel) ? { accountLabel: responseAccountLabel(raw, accountLabel) } : {}),
+			windows: dedupeCodexWindows(windows),
 			fetchedAt: now,
 		};
 	}
@@ -417,14 +442,14 @@ export function normalizeCodexUsageResponse(payload: unknown, providerId = "open
 	const windows = (["5h", "7d"] as const)
 		.map((id) => bestByWindow.get(id)?.window)
 		.filter((window): window is LimitWindow => Boolean(window));
-	if (windows.length !== 2) {
-		throw new Error("Codex usage response did not include both 5h and 7d limit windows");
+	if (windows.length === 0) {
+		throw new Error("Codex usage response did not include any recognizable limit windows");
 	}
 
 	return {
 		providerId,
 		providerLabel: "Codex",
-		...(accountLabel ? { accountLabel } : {}),
+		...(responseAccountLabel(raw, accountLabel) ? { accountLabel: responseAccountLabel(raw, accountLabel) } : {}),
 		windows,
 		fetchedAt: now,
 	};
