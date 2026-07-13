@@ -2,6 +2,11 @@
   "name": "@aneviaro/pi-codex-limit-tracking-footer",
   "version": "0.1.1",
   "description": "A Pi footer extension for Codex subscription limit tracking.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aneviaro/pipack.git",
+    "directory": "packages/codex-limit-tracking-footer"
+  },
   "type": "module",
   "license": "MIT",
   "engines": {

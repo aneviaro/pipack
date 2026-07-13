@@ -26,6 +26,9 @@
 !/README.md
 !/bootstrap.sh
 !/docs/pi-safe-rm-spec.md
+!/.github/
+!/.github/workflows/
+!/.github/workflows/**
 
 # --- agent config (no secrets here) ---
 !/agent/settings.json

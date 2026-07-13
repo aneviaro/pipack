@@ -1,0 +1,162 @@
+name: Publish npm packages
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-npm-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Discover local packages
+    runs-on: ubuntu-24.04
+    outputs:
+      packages: ${{ steps.packages.outputs.packages }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read package list
+        id: packages
+        shell: bash
+        run: |
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs = require('fs');
+          const path = require('path');
+
+          const settingsPath = path.join('agent', 'settings.json');
+          const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+          const settingsDir = path.dirname(settingsPath);
+          const packages = [];
+
+          for (const entry of settings.packages ?? []) {
+            if (typeof entry !== 'string') continue;
+
+            // Publish only local packages listed in agent/settings.json.
+            // External npm:/git:/https: packages are third-party dependencies.
+            if (!entry.startsWith('../packages/') && !entry.startsWith('./packages/') && !entry.startsWith('packages/')) {
+              continue;
+            }
+
+            const packagePath = entry.startsWith('packages/')
+              ? path.normalize(entry)
+              : path.normalize(path.join(settingsDir, entry));
+            const manifestPath = path.join(packagePath, 'package.json');
+            if (!fs.existsSync(manifestPath)) {
+              throw new Error(`Package list entry ${entry} resolved to ${packagePath}, but no package.json exists there`);
+            }
+
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            if (!manifest.name) {
+              throw new Error(`${manifestPath} is missing a package name`);
+            }
+
+            packages.push({ path: packagePath, name: manifest.name });
+          }
+
+          if (packages.length === 0) {
+            throw new Error('No local packages from agent/settings.json were found to publish');
+          }
+
+          console.log(`packages=${JSON.stringify(packages)}`);
+          NODE
+
+  verify:
+    name: Verify ${{ matrix.package.name }}
+    needs: discover
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.discover.outputs.packages) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        shell: bash
+        working-directory: ${{ matrix.package.path }}
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif node -e "const p=require('./package.json'); process.exit(Object.keys({...(p.dependencies||{}), ...(p.devDependencies||{}), ...(p.optionalDependencies||{})}).length ? 0 : 1)"; then
+            npm install --package-lock=false
+          else
+            echo "No lockfile or install-time dependencies; skipping npm install."
+          fi
+
+      - name: Run typecheck if present
+        shell: bash
+        working-directory: ${{ matrix.package.path }}
+        run: npm run typecheck --if-present
+
+      - name: Run tests if present
+        shell: bash
+        working-directory: ${{ matrix.package.path }}
+        run: npm test --if-present
+
+      - name: Check package contents
+        shell: bash
+        working-directory: ${{ matrix.package.path }}
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['pack:check'] ? 0 : 1)"; then
+            npm run pack:check
+          else
+            npm pack --dry-run
+          fi
+
+  publish:
+    name: Publish ${{ matrix.package.name }}
+    needs: [discover, verify]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.discover.outputs.packages) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        shell: bash
+        working-directory: ${{ matrix.package.path }}
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif node -e "const p=require('./package.json'); process.exit(Object.keys({...(p.dependencies||{}), ...(p.devDependencies||{}), ...(p.optionalDependencies||{})}).length ? 0 : 1)"; then
+            npm install --package-lock=false
+          else
+            echo "No lockfile or install-time dependencies; skipping npm install."
+          fi
+
+      - name: Publish if this version is not on npm
+        shell: bash
+        working-directory: ${{ matrix.package.path }}
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION is already published; skipping."
+            exit 0
+          fi
+
+          npm publish --access public --provenance

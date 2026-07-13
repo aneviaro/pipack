@@ -2,6 +2,11 @@
   "name": "@aneviaro/pi-ask-user-question",
   "version": "0.1.1",
   "description": "A blocking user-question tool for Pi coding agent.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aneviaro/pipack.git",
+    "directory": "packages/ask-user-question"
+  },
   "keywords": [
     "pi-package",
     "pi",
@@ -15,6 +20,9 @@
     "extensions": [
       "./extensions/ask-user-question.ts"
     ]
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
