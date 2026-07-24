@@ -11,8 +11,9 @@ configuration: settings, custom skills, and npm dependency manifests.
 | `agent/mcp-onboarding.json` | Onboarding flags |
 | `agent/skills/` | Custom skills |
 | `agent/npm/package.json` (+ lock) | pi npm extensions manifest |
-| `packages/ask-user-question/` | Publishable `ask_user_question` Pi package |
-| `packages/codex-limit-tracking-footer/` | Publishable Codex limit footer Pi package |
+| `packages/ask-user-question/` | Published `ask_user_question` Pi package |
+| `packages/codex-limit-tracking-footer/` | Published Codex limit footer Pi package |
+| `packages/safe-rm/` | Published recursive-force `rm` validation Pi package |
 | `bootstrap.sh` | One-command restore on a new machine |
 
 ## Included Pi packages
@@ -35,6 +36,14 @@ Adds a 5-hour/weekly Codex subscription-limit segment to Pi's footer, with seman
 
 ```bash
 pi install npm:@aneviaro/pi-codex-limit-tracking-footer
+```
+
+### `@aneviaro/pi-safe-rm`
+
+Blocks model-issued recursive-force `rm` commands, requires the model to call `validate_rm` for a deletion summary, then allows one exact retry if the filesystem snapshot is unchanged.
+
+```bash
+pi install npm:@aneviaro/pi-safe-rm
 ```
 
 ## What's deliberately NOT tracked (see `.gitignore`)

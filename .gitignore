@@ -26,6 +26,7 @@
 !/README.md
 !/bootstrap.sh
 !/docs/pi-safe-rm-spec.md
+!/docs/plans/**
 !/.github/
 !/.github/workflows/
 !/.github/workflows/**
@@ -55,6 +56,17 @@
 !/packages/codex-limit-tracking-footer/test/
 !/packages/codex-limit-tracking-footer/test/**
 /packages/codex-limit-tracking-footer/node_modules/
+!/packages/safe-rm/
+!/packages/safe-rm/LICENSE
+!/packages/safe-rm/README.md
+!/packages/safe-rm/package.json
+!/packages/safe-rm/package-lock.json
+!/packages/safe-rm/tsconfig.json
+!/packages/safe-rm/extensions/
+!/packages/safe-rm/extensions/**
+!/packages/safe-rm/test/
+!/packages/safe-rm/test/**
+/packages/safe-rm/node_modules/
 
 # --- npm dependency manifests (NOT node_modules) ---
 # NOTE: agent/npm/.gitignore is pi-managed and contains "*", which (by

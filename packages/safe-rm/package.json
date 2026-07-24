@@ -1,0 +1,51 @@
+{
+  "name": "@aneviaro/pi-safe-rm",
+  "version": "0.1.0",
+  "description": "A Pi extension that validates recursive-force rm commands before execution.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "rm",
+    "safety"
+  ],
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --import tsx --test",
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/safe-rm.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.3",
+    "typebox": "^1.1.38",
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
