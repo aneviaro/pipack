@@ -198,6 +198,7 @@ The approval remains consumed even if the eventual shell process fails. A later 
 - Fail closed for dynamic targets and ambiguous parsing.
 - Enumerate supported targets without following symlinks or reading contents.
 - Enforce critical-root denial and the 10,000-entry cap.
+- For hard-cap or unsupported-deletion refusals, create no executable approval and do not suggest splitting the same directory tree into child deletion commands or manual batches.
 - Return a summary and deterministic sample to the model.
 - Require an exact, one-time retry within five minutes.
 - Invalidate validation when the path/type fingerprint changes.
@@ -316,6 +317,7 @@ Only `validated` creates an approval.
 - It must give the exact next action and request ID rather than relying only on the tool description.
 - `validate_rm` should clearly separate roots, counts, sample paths, omitted count, warnings, and expiration.
 - Dangerous targets and dynamic syntax should name the reason without suggesting a bypass.
+- Hard-cap or unsupported-deletion refusals must either use an approved top-level literal-root path or clearly refuse; they must never recommend hand-built child deletion commands or manual batches. Top-level literal-root bounded summaries are separate planned work in `docs/plans/20260724-remove-literal-directory-entry-cap.md`.
 - A changed snapshot should explicitly state that revalidation is required and provide the new request ID.
 - The extension requires no interactive UI and works in TUI, RPC, and other model-driven modes where custom tools and tool-call interception are available.
 - The package README must explain the model-only approval model, protected roots, unsupported dynamic syntax, 10,000-entry cap, five-minute TTL, and residual race limitation.
@@ -356,6 +358,8 @@ The extension is enabled when the package is loaded. Version 1 has no feature fl
 - Test file, directory, symlink, broken-symlink, and other file-type counts; verify symlink targets are never traversed.
 - Test deterministic summaries, escaping of control characters, sample limits, and fingerprint stability.
 - Verify traversal fails closed at entry 10,001, on permission/filesystem errors, and on cancellation.
+- Verify hard-cap refusal wording reports the cap, discovered count, no approval, and no files deleted or executable approval; assert it does not suggest smaller deletions, batches, subtrees, or narrowing the glob/path.
+- Verify registered `validate_rm` prompt guidelines prohibit manual child-directory batching after a refusal.
 - Test permanent denial for `/`, home, cwd, and cwd ancestors through normalized and globbed spellings.
 - Verify successful validation allows only one exact command/cwd retry and that approval expires after five minutes.
 - Verify approvals do not cross sessions, survive consumption, or survive lifecycle resets.

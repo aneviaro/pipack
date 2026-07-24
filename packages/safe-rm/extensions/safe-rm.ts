@@ -639,9 +639,10 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 export function tooManyEntriesMessage(discoveredEntries: number): string {
 	return [
-		`Hard cap is ${ENTRY_LIMIT.toLocaleString()} entries; this deletion set has more.`,
-		"Retrying unchanged will keep blocking.",
-		"Delete smaller chunks in batches, narrow the glob/path.",
+		`Hard cap is ${ENTRY_LIMIT.toLocaleString()} entries; at least ${discoveredEntries.toLocaleString()} entries were discovered.`,
+		"No approval was created and no files were deleted.",
+		"This command cannot be authorized or executed.",
+		"Do not split the same directory tree into child deletion commands or manual batches.",
 	].join(" ");
 }
 
@@ -948,6 +949,7 @@ export default function safeRm(pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use validate_rm only when Pi blocks a bash rm command and provides a requestId.",
 			"After validate_rm returns a validated deletion summary, inspect it and retry the exact same bash command only if the deletion set is correct.",
+			"Do not work around a validate_rm refusal by splitting the same directory tree into child deletion commands or manual batches.",
 		],
 		parameters: Type.Object({
 			requestId: Type.String({ description: "Opaque request ID from the blocked bash tool result" }),

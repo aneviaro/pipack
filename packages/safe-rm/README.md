@@ -12,7 +12,7 @@ Pi extension that intercepts model-issued `bash` calls containing recursive-forc
 - Permanently denies `/`, your home directory, the working directory, and any ancestor of the working directory.
 - Supports literal path operands and standard `*`, `?`, and bracket-expression globs.
 - Rejects dynamic targets such as variables, command substitution, process substitution, `eval`, `xargs rm -rf`, `find -exec rm -rf`, brace expansion, extglob, and unsupported nested shell rewrites.
-- Traverses with `lstat`, does not follow symlinks, reads no file contents, and fails closed above 10,000 discovered entries.
+- Traverses with `lstat`, does not follow symlinks, reads no file contents, and fails closed above 10,000 discovered entries. An over-cap validation creates no approval and deletes no files; do not split the same directory tree into child deletion commands or manual batches.
 
 ## Install
 

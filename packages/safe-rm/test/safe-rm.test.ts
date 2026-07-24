@@ -142,14 +142,28 @@ test("rewrites approved commands to concrete quoted roots", async () => {
 	);
 });
 
-test("entry cap uses 10,000 and reports an actionable hard-cap message", () => {
+test("entry cap refuses approval without suggesting manual batching", () => {
 	assert.equal(ENTRY_LIMIT, 10_000);
 	const message = tooManyEntriesMessage(10_001);
 	assert.match(message, /Hard cap is 10,000 entries/);
-	assert.match(message, /at least 10,001 discovered entries/);
-	assert.match(message, /cannot authorize this single rm -rf/);
-	assert.match(message, /delete smaller subtrees in batches/);
-	assert.match(message, /ask_user_question first/);
+	assert.match(message, /at least 10,001 entries were discovered/);
+	assert.match(message, /No approval was created/);
+	assert.match(message, /no files were deleted/);
+	assert.match(message, /cannot be authorized or executed/);
+	assert.doesNotMatch(message, /delete smaller|smaller chunks|chunks in batches|subtrees in batches|narrow the glob|narrow the path/i);
+});
+
+test("registers validate_rm guidance against manual directory batching", () => {
+	let validateRm: any;
+	safeRm({
+		registerTool(definition: any) {
+			if (definition.name === "validate_rm") validateRm = definition;
+		},
+		on() {},
+	} as any);
+
+	assert.ok(validateRm);
+	assert.match(validateRm.promptGuidelines.join(" "), /do not work around a validate_rm refusal.*child deletion commands.*manual batches/i);
 });
 
 test("Pi hook blocks, validate_rm approves, and one retry is rewritten", async () => {
