@@ -38,10 +38,10 @@ Produce a plan with:
    - If the spec is ambiguous, make a reasonable assumption and record it in the plan.
    - Use `ask_user_question` only when a product/contract decision blocks planning.
 5. Write or update a Markdown plan.
-6. Confirm the plan is Ralphex-compatible by checking that it contains at least one executable task heading matching exactly:
-   - `### Task 1: <title>`
-   - `### Task 2: <title>`
-   - or `### Iteration 1: <title>`
+6. Confirm the plan is executable by the `implementation` skill:
+   - it contains at least one task heading matching `### Task N: <title>` or `### Iteration N: <title>`;
+   - every task section contains at least one unchecked checklist item;
+   - every task includes verification and observable completion criteria.
 7. Run the `revdiff` skill against the saved plan (`--only <plan-path>`; add `--untracked` for a new file). Process captured annotations and update the plan when needed.
 8. Report the saved file path and no more than three important caveats.
 
@@ -67,7 +67,7 @@ Rules:
 - Do not hide task headings inside code blocks.
 - Each task must be completable in one focused implementation pass.
 - Each task must include a verification command or manual verification step.
-- Prefer unchecked checklist items (`- [ ]`) inside tasks so progress can be marked.
+- Include at least one unchecked checklist item (`- [ ]`) in every task so progress can be marked and resumed.
 - Do not include tasks that only say "review", "investigate", or "decide" unless they produce a concrete repository artifact.
 - If discovery is needed, make it a bounded implementation task with an output file, fixture, test, or documented decision.
 
