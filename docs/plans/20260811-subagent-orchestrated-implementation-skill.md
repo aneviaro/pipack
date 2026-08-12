@@ -73,16 +73,22 @@ Files:
 - Modify: `agent/npm/package-lock.json` — retain the matching resolved dependency graph.
 
 Steps:
-- [ ] Define `implementation-worker` with `model: openai-codex/gpt-5.6-luna`, `thinking: xhigh`, `prompt_mode: replace`, only repository inspection/editing tools, no inherited extensions or skills, no nested delegation, disabled transcript/session persistence, a bounded turn budget, and instructions to implement only the supplied task packet, run requested verification, avoid plan/checklist changes, and never stage or commit.
-- [ ] Define `task-reviewer` with `model: openai-codex/gpt-5.6-sol`, `thinking: low`, `prompt_mode: replace`, read-only repository tools, no inherited extensions or skills, disabled transcript/session persistence, a bounded turn budget, and a strict output contract covering material findings, task coverage, verification evidence, and `approve` or `request changes`.
-- [ ] Add `agent/subagents.json` with `fallbackSubagent: "none"` so missing, disabled, ambiguous, or misspelled orchestration agent types cannot silently become unrestricted general-purpose agents.
-- [ ] Allowlist `agent/agents/**` and `agent/subagents.json` without allowing any session, transcript, memory, credential, or generated package data.
-- [ ] Verify the existing package manifest and lockfile changes resolve to the installed `@tintinweb/pi-subagents` version; do not include `agent/settings.json` noise.
+- [x] Define `implementation-worker` with `model: openai-codex/gpt-5.6-luna`, `thinking: xhigh`, `prompt_mode: replace`, only repository inspection/editing tools, no inherited extensions or skills, no nested delegation, disabled transcript/session persistence, a bounded turn budget, and instructions to implement only the supplied task packet, run requested verification, avoid plan/checklist changes, and never stage or commit.
+- [x] Define `task-reviewer` with `model: openai-codex/gpt-5.6-sol`, `thinking: low`, `prompt_mode: replace`, read-only repository tools, no inherited extensions or skills, disabled transcript/session persistence, a bounded turn budget, and a strict output contract covering material findings, task coverage, verification evidence, and `approve` or `request changes`.
+- [x] Add `agent/subagents.json` with `fallbackSubagent: "none"` so missing, disabled, ambiguous, or misspelled orchestration agent types cannot silently become unrestricted general-purpose agents.
+- [x] Allowlist `agent/agents/**` and `agent/subagents.json` without allowing any session, transcript, memory, credential, or generated package data.
+- [x] Verify the existing package manifest and lockfile changes resolve to the installed `@tintinweb/pi-subagents` version; do not include `agent/settings.json` noise.
 
 Verification:
 - `node -e 'JSON.parse(require("fs").readFileSync("agent/subagents.json", "utf8")); console.log("valid subagents.json")'`
 - `git status --short --untracked-files=all -- agent/agents agent/subagents.json agent/npm/package.json agent/npm/package-lock.json .gitignore`
 - Start a fresh Pi session, open `/agents`, and confirm `implementation-worker` has write tools but no nested agent tools, while `task-reviewer` has no `write` or `edit` tool.
+
+Verification evidence:
+- `node -e ...` — PASS (`valid subagents.json`).
+- Manifest/lockfile/install resolution check — PASS (`0.15.0`).
+- `git diff --check` — PASS.
+- Fresh Pi `/agents` session — PASS; both exact names appeared with `gpt-5.6-luna` / `gpt-5.6-sol`.
 
 Completion criteria:
 - Both custom agent types resolve by exact name and configured model/reasoning level after restart.
