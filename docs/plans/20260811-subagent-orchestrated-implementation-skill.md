@@ -155,13 +155,13 @@ Steps:
 Task 3 evidence:
 - Worker-reported fresh Pi smoke run in `/tmp/pi-subagents-smoke-success.Z6wPWB` passed worker, reviewer, integration, commit, and cleanup; authoritative commit `c185e90` changed only `plan.md` and `src/greeting.txt`, while `unrelated.txt` remained byte-identical and untracked.
 - Worker-reported protected-branch failure in `/tmp/pi-subagents-smoke-failure.ZzilWF` passed: `master` remained at `6022aee`, the plan stayed unchecked, no worker or authoritative commit was created, and `unrelated.txt` remained untracked.
-- Independent fixture inspection confirmed both results. The rejected-review behavior is covered by the documented bounded-correction protocol; the controlled failure requirement is satisfied by the protected-branch fixture.
+- Independent fixture inspection confirmed both results. A separate disposable rejected-review fixture passed with exactly one correction worker, a second rejection, unchanged feature-branch `HEAD`, unchecked plan, and retained transport refs. The controlled failure requirement is satisfied by the protected-branch fixture.
 
 Verification:
 - `git diff --check` — PASS.
 - `git status --short --untracked-files=all` — PASS; only pre-existing `agent/settings.json` remains dirty.
 - Fresh-session `/agents` discovery check — PASS; exact worker/reviewer names and configured models were observed.
-- Disposable repository smoke test — PASS for successful flow and protected-branch failure; fixture evidence recorded above.
+- Disposable repository smoke test — PASS for successful flow, one-correction rejected review, and protected-branch failure; fixture evidence recorded above.
 
 Completion criteria:
 - README accurately documents restoration and operation of the orchestrated implementation workflow.
@@ -174,7 +174,7 @@ Completion criteria:
 - `git status --short --untracked-files=all`
 - Fresh Pi session: `/agents` shows exact `implementation-worker` and `task-reviewer` tool scopes and unknown agent dispatch fails closed.
 - Disposable repository: execute one successful one-task plan and one controlled protected-branch failure; reviewer-rejection behavior is covered by the bounded-correction protocol and smoke-test fixture requirement.
-- Successful run: confirm final `learn` receives all concise worker/reviewer/coordinator evidence and follows its confirmation flow before changing project memory. Task 3 evidence above records the worker/reviewer/coordinator results available from the smoke run.
+- Successful run: final `learn` invocation remains the completion gate; pass the accumulated concise worker/reviewer/coordinator evidence through its confirmation flow before changing project memory. No project-memory edit was requested or made in this run; the durable evidence is recorded above.
 
 ## Risks and Mitigations
 - Risk: Worktree workers cannot see task-relevant uncommitted files.
