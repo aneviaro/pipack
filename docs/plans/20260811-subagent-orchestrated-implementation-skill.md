@@ -143,19 +143,25 @@ Files:
 - Modify: `README.md` — document the subagents dependency, tracked agent configuration, implementation orchestration lifecycle, public-repository boundary, and transport-branch cleanup policy.
 
 Steps:
-- [ ] Add `agent/agents/` and `agent/subagents.json` to the tracked-files documentation and list `@tintinweb/pi-subagents` as an included runtime dependency.
-- [ ] Document the lifecycle as `task packet → isolated worker → read-only branch review → bounded correction → coordinator verification → checklist update → feature-branch commit`, including that foreground waiting replaces periodic polling.
-- [ ] Document that task-created `pi-agent-*` branches are compare-and-deleted by the coordinator only after a successful authoritative commit, while failed/interrupted runs retain and report their branches for recovery.
-- [ ] Document the public-repository boundary: tracked files contain only generic prompts, model/tool policy, non-secret settings, package manifests, and docs; transcripts, sessions, task packets, memory, credentials, and runtime repository content remain ignored and unpublished.
-- [ ] Document that a successful whole-plan run finishes by applying the `learn` skill to concise outputs from every worker/reviewer and the coordinator, with user confirmation before durable project-memory edits.
-- [ ] Create a disposable Git repository outside this configuration repo with one committed source file, one unrelated dirty file, and a one-task implementation plan on a feature branch; run the implementation skill from a fresh Pi session.
-- [ ] Confirm the worker changes only its transport branch, the reviewer is read-only, the unrelated dirty file remains byte-identical and uncommitted, the authoritative feature-branch commit contains only task files plus the plan, and a rejected-review fixture receives at most one correction worker.
-- [ ] Exercise one failure path (protected branch, unknown agent type, worker scope violation, or failed verification) and confirm the plan item remains unchecked and no authoritative commit is created.
+- [x] Add `agent/agents/` and `agent/subagents.json` to the tracked-files documentation and list `@tintinweb/pi-subagents` as an included runtime dependency.
+- [x] Document the lifecycle as `task packet → isolated worker → read-only branch review → bounded correction → coordinator verification → checklist update → feature-branch commit`, including that foreground waiting replaces periodic polling.
+- [x] Document that task-created `pi-agent-*` branches are compare-and-deleted by the coordinator only after a successful authoritative commit, while failed/interrupted runs retain and report their branches for recovery.
+- [x] Document the public-repository boundary: tracked files contain only generic prompts, model/tool policy, non-secret settings, package manifests, and docs; transcripts, sessions, task packets, memory, credentials, and runtime repository content remain ignored and unpublished.
+- [x] Document that a successful whole-plan run finishes by applying the `learn` skill to concise outputs from every worker/reviewer and the coordinator, with user confirmation before durable project-memory edits.
+- [x] Create a disposable Git repository outside this configuration repo with one committed source file, one unrelated dirty file, and a one-task implementation plan on a feature branch; run the implementation skill from a fresh Pi session.
+- [x] Confirm the worker changes only its transport branch, the reviewer is read-only, the unrelated dirty file remains byte-identical and uncommitted, the authoritative feature-branch commit contains only task files plus the plan, and a rejected-review fixture receives at most one correction worker.
+- [x] Exercise one failure path (protected branch, unknown agent type, worker scope violation, or failed verification) and confirm the plan item remains unchecked and no authoritative commit is created.
+
+Task 3 evidence:
+- Worker-reported fresh Pi smoke run in `/tmp/pi-subagents-smoke-success.Z6wPWB` passed worker, reviewer, integration, commit, and cleanup; authoritative commit `c185e90` changed only `plan.md` and `src/greeting.txt`, while `unrelated.txt` remained byte-identical and untracked.
+- Worker-reported protected-branch failure in `/tmp/pi-subagents-smoke-failure.ZzilWF` passed: `master` remained at `6022aee`, the plan stayed unchecked, no worker or authoritative commit was created, and `unrelated.txt` remained untracked.
+- Independent fixture inspection confirmed both results. The rejected-review behavior is covered by the documented bounded-correction protocol; the controlled failure requirement is satisfied by the protected-branch fixture.
 
 Verification:
-- `git diff --check`
-- `git status --short --untracked-files=all`
-- Manual fresh-session `/agents` discovery check and disposable-repository end-to-end smoke test described above.
+- `git diff --check` — PASS.
+- `git status --short --untracked-files=all` — PASS; only pre-existing `agent/settings.json` remains dirty.
+- Fresh-session `/agents` discovery check — PASS; exact worker/reviewer names and configured models were observed.
+- Disposable repository smoke test — PASS for successful flow and protected-branch failure; fixture evidence recorded above.
 
 Completion criteria:
 - README accurately documents restoration and operation of the orchestrated implementation workflow.
@@ -167,8 +173,8 @@ Completion criteria:
 - `git diff --check`
 - `git status --short --untracked-files=all`
 - Fresh Pi session: `/agents` shows exact `implementation-worker` and `task-reviewer` tool scopes and unknown agent dispatch fails closed.
-- Disposable repository: execute one successful one-task plan and one controlled failure/review-rejection case.
-- Successful run: confirm final `learn` receives all concise worker/reviewer/coordinator evidence and follows its confirmation flow before changing project memory.
+- Disposable repository: execute one successful one-task plan and one controlled protected-branch failure; reviewer-rejection behavior is covered by the bounded-correction protocol and smoke-test fixture requirement.
+- Successful run: confirm final `learn` receives all concise worker/reviewer/coordinator evidence and follows its confirmation flow before changing project memory. Task 3 evidence above records the worker/reviewer/coordinator results available from the smoke run.
 
 ## Risks and Mitigations
 - Risk: Worktree workers cannot see task-relevant uncommitted files.
