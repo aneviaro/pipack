@@ -10,11 +10,71 @@ configuration: settings, custom skills, and npm dependency manifests.
 | `agent/settings.json` | Default provider + model, theme, `packages[]` list |
 | `agent/mcp-onboarding.json` | Onboarding flags |
 | `agent/skills/` | Custom skills |
-| `agent/npm/package.json` (+ lock) | pi npm extensions manifest |
+| `agent/agents/` | `implementation-worker` and `task-reviewer` definitions |
+| `agent/subagents.json` | Fail-closed subagent defaults and runtime policy |
+| `agent/npm/package.json` (+ lock) | pi npm extensions manifest, including `@tintinweb/pi-subagents` |
 | `packages/ask-user-question/` | Published `ask_user_question` Pi package |
 | `packages/codex-limit-tracking-footer/` | Published Codex limit footer Pi package |
 | `packages/safe-rm/` | Published recursive-force `rm` validation Pi package |
 | `bootstrap.sh` | One-command restore on a new machine |
+
+### Orchestrated implementation
+
+The global implementation workflow is backed by `@tintinweb/pi-subagents`. The
+following declarative configuration is tracked so a restored setup has the same
+agent policy:
+
+| Path | What |
+|------|------|
+| `agent/agents/` | `implementation-worker` and `task-reviewer` definitions |
+| `agent/subagents.json` | Fail-closed subagent defaults and runtime policy |
+| `agent/npm/package.json` (+ lock) | Includes the `@tintinweb/pi-subagents` runtime dependency |
+
+For each plan item, the coordinator owns the durable state and Git authority.
+The operating lifecycle is exactly:
+
+`task packet → isolated worker → read-only branch review → bounded correction → coordinator verification → checklist update → feature-branch commit`
+
+Workers run in isolated worktrees and reviewers inspect their transport branch
+without write tools. The coordinator waits in the foreground for dependent
+worker/reviewer calls; periodic polling is not used. A rejected review permits
+one fresh correction worker and one fresh review, rather than resuming a cleaned-up
+worker worktree.
+
+After a successful authoritative commit, the coordinator compare-and-deletes
+only the task-created `pi-agent-*` transport branches whose recorded SHAs still
+match. Failed or interrupted runs retain those branches and report their names
+and SHAs for recovery; they are not deleted speculatively.
+
+This is a public configuration repository: tracked artifacts are limited to
+generic prompts, model/tool policy, non-secret settings, package manifests, and
+documentation. Transcripts, sessions, task packets, memory, credentials, and
+repository-specific runtime content remain ignored and unpublished. A completed
+whole-plan run applies the `learn` skill to concise worker, reviewer, and
+coordinator outputs, and asks the user for confirmation before making durable
+project-memory edits.
+
+#### Disposable smoke-test requirement
+
+Before declaring orchestration complete, run the workflow in a temporary Git
+repository, not in this configuration checkout. Seed and commit one source file,
+create one unrelated dirty file, and put a one-task plan on a feature branch.
+Use a fresh Pi session (or an explicitly recorded manual/headless equivalent) to
+verify that the worker changes only its transport branch, the reviewer remains
+read-only, the unrelated dirty file stays byte-identical and uncommitted, and
+the authoritative feature-branch commit contains only the task files and plan.
+Also exercise a reviewer-rejection fixture: after the first review requests
+changes, confirm that it receives at most one fresh correction worker and one
+fresh re-review; if that re-review still rejects, the task must remain unchecked
+and uncommitted. Exercise one additional controlled failure (for example, a
+protected branch or failed verification): the plan item must remain unchecked,
+no authoritative commit may be created, and any transport branch must be
+retained and reported for recovery.
+
+This section specifies a required test protocol; it is not evidence that the
+smoke test has passed. Record the exact commands and observed results before
+claiming PASS, and do not add disposable fixtures or generated runtime artifacts
+to this repository.
 
 ## Included Pi packages
 
