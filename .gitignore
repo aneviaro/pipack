@@ -38,6 +38,11 @@
 # --- custom skills (whole trees) ---
 !/agent/skills/**
 
+# --- custom subagents and dispatch policy (no runtime state) ---
+!/agent/agents/
+!/agent/agents/**
+!/agent/subagents.json
+
 # --- custom extensions ---
 !/agent/extensions/**
 
