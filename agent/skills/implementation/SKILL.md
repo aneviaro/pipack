@@ -6,7 +6,7 @@ description: Execute an existing repository-grounded implementation plan task by
 # Implementation
 
 Execute a saved implementation plan as a resumable, coordinator-owned task loop. The
-main Pi session is the durable coordinator. It does not implement plan tasks directly:
+main Pi session is the coordinator. It does not implement plan tasks directly:
 it delegates each pending task to an `implementation-worker`, obtains a preserved
 `pi-agent-*` transport branch, has a fresh `task-reviewer` inspect that ref, and
 integrates only an approved result. Plan checkboxes and authoritative commits remain
@@ -14,7 +14,7 @@ owned by the coordinator.
 
 This is a skill-only protocol. Use the installed `@tintinweb/pi-subagents` package's
 native `Agent` lifecycle, custom agent types, completion notifications, and
-`get_subagent_result`; do not invent or depend on a coordinator extension. Transport
+`get_subagent_result`. Transport
 branches are preservation artifacts, not accepted history. A completed worktree is
 removed by the package, so a correction always uses a fresh worker.
 
@@ -22,7 +22,10 @@ removed by the package, so a correction always uses a fresh worker.
 
 The user may provide a plan path. If a blocking decision is required, use
 `ask_user_question` with one concise question, likely options, and a decisive
-`recommendation`. Do not ask in plain chat unless the tool is unavailable.
+`recommendation`. Do not ask in plain chat unless the tool is unavailable. If the
+user says to continue after a review rejection, treat that as authorization for the
+next bounded correction cycle under this protocol, not as permission to bypass
+worker/reviewer gates or implement directly.
 
 ## Plan Selection
 
@@ -49,9 +52,15 @@ The following invariants apply for the whole run:
 - The main session alone may edit plan checkboxes, stage files, or create
   authoritative commits. Workers never use the main working tree, and reviewers never
   edit code.
-- Every task has at most one initial worker, one fresh correction worker, and one fresh
-  re-review after a correction. A second rejection stops that task with its checkboxes
-  unchecked.
+- Every task has one implementation worker followed by a sequence of correction cycles. Each
+  correction cycle uses a fresh implementation worker and a
+  fresh reviewer from the unchanged task base. The coordinator may continue through
+  reviewer-requested changes while findings are material, task-scoped, within the
+  frozen allowed paths, and require no new product decision. Stop only when the
+  correction budget is exhausted, a finding requires a new decision or expanded
+  scope, or a safety gate fails. Default correction budget: three correction cycles
+  after the initial worker; after that, a user may explicitly grant one additional
+  bounded cycle at a blocked resume point.
 - Every accepted task has one authoritative commit on the captured active feature
   branch. The worker's preservation commit(s) and `pi-agent-*` ref are never merged or
   retained as task history.
@@ -217,21 +226,30 @@ ledger; do not persist its transcript.
 
 ### 5. Bounded correction and re-review
 
-If the first reviewer says `request changes`, do not integrate the rejected branch.
-Confirm that the main branch, base SHA, index, and baseline are unchanged. Launch at
-most one fresh `implementation-worker` from that unchanged base with
-`isolation: "worktree"`, foreground execution, the full original task packet, and only
-the reviewer's material findings as an additional correction section. Do not resume,
-steer, or reuse the completed worker: its worktree has been removed and its transport
-history is not a correction base.
+If any task reviewer says `request changes`, do not integrate the rejected branch.
+Confirm that the main branch, base SHA, index, and baseline are unchanged. If the
+review findings are material, task-scoped, compatible with the frozen allowed paths,
+and require no new product decision, launch the next correction cycle while correction
+budget remains. Use a fresh `implementation-worker` from the unchanged base with
+`isolation: "worktree"`, foreground execution, the full original task packet, and a
+concise correction section containing only the material findings and the latest
+validated rejected branch name/SHA as read-only implementation evidence. The worker
+may inspect that branch or its diff, but it must produce a new transport branch whose
+merge base is the unchanged task base. Do not resume, steer, or reuse the completed
+worker: its worktree has been removed and its transport history is not an accepted
+history base.
 
-Validate the correction branch with the same result, ancestry, no-merge, scope,
-worker-report, and baseline-drift gates. Then launch one fresh foreground
-`task-reviewer` with the same exact packet and the replacement branch details. There
-are no further correction loops. If the second review requests changes, stop with all
-current task checkboxes unchecked; do not integrate, update the plan, or create an
-authoritative commit. Retain and report both current-run transport refs. Worker or
-branch failure during correction is likewise blocked and does not count as approval.
+Validate every correction branch with the same result, ancestry, no-merge, scope,
+worker-report, and baseline-drift gates. Then launch a fresh foreground
+`task-reviewer` with the same exact task packet and the replacement branch details.
+Repeat only while correction budget remains and each rejection is still narrow,
+task-scoped, and decision-free. The default budget is three correction cycles after
+the initial worker; when exhausted, stop with all current task checkboxes unchecked,
+do not integrate, update the plan, or create an authoritative commit, and report the
+latest findings plus all current-task transport refs. A user may explicitly authorize
+one additional bounded cycle at resume time; record that authorization in the concise
+evidence ledger. Worker or branch failure during any correction is blocked and does
+not count as approval.
 
 Only an explicit approval for the currently accepted branch can proceed.
 
@@ -286,8 +304,10 @@ until the new base and clean index are confirmed.
 ### 8. Compare-and-delete only this task's transport refs
 
 After a successful authoritative task commit, clean only the transport refs recorded
-as created by this task (the initial branch and, if used, its correction branch).
-For each ref, first verify it still points to its recorded SHA, then use Git's atomic
+as created by this task's accepted attempt and bounded correction chain, including
+rejected in-scope correction refs and the accepted ref. Never clean refs that were
+pre-existing at the run/resume preflight. For each ref, first verify it still points
+to its recorded SHA, then use Git's atomic
 compare-and-delete semantics, equivalent to:
 
 ```sh
@@ -379,10 +399,11 @@ exact state rather than guessing in each of these cases:
 - **Scope violation:** a branch changes an unexpected or protected path, changes the
   plan, or violates packet prohibitions. Reject it before review/integration and
   retain/report the transport ref.
-- **Review rejection after correction:** after one fresh correction worker, a fresh
-  re-review still requests changes. Stop with task checkboxes unchecked; do not create
-  an authoritative commit. Resume only with an explicit new decision or corrected
-  task inputs, not an unbounded loop.
+- **Review rejection budget exhausted:** after the configured bounded correction
+  cycles, a fresh re-review still requests changes. Stop with task checkboxes
+  unchecked; do not create an authoritative commit. Resume only with explicit user
+  authorization for one additional bounded cycle or with corrected task inputs; never
+  continue an unbounded loop or bypass the worker/reviewer gates.
 - **Active-branch drift:** branch name, main `HEAD`, index, or baseline ownership
   changes unexpectedly during worker/reviewer work. Stop before integration or any
   checklist/commit mutation; retain refs and report expected versus observed state.
@@ -402,8 +423,11 @@ exact state rather than guessing in each of these cases:
 
 To resume any blocked run, reread the plan, status, and the recorded base/baseline/ref
 state. Treat checked tasks as complete only when repository evidence and their
-authoritative commits agree. Start at the first unchecked task, or at the named
-cleanup/final-learning gate when a task commit already succeeded. Never discard user
+authoritative commits agree. Start at the first unchecked task, at the named
+cleanup/final-learning gate when a task commit already succeeded, or at a bounded
+correction cycle explicitly authorized by the user after a review-rejection budget
+stop. In that correction resume, keep the original task base unchanged and pass the
+latest validated rejected branch only as read-only evidence. Never discard user
 changes, rewrite history, or reuse a removed worktree worker.
 
 ## Final Report
@@ -432,6 +456,9 @@ reported cleanup mismatch), completed cross-task gates, and confirmed final lear
   at most one blocking `get_subagent_result(wait: true)` for genuine background work.
 - Keep the plan as the durable source of task progress and preserve unrelated user
   changes exactly.
+- Continue reviewer-requested corrections within the bounded correction budget when
+  findings are task-scoped and decision-free; stop only when budget, scope, decision,
+  branch, baseline, or verification gates require it.
 - Never skip worker/branch validation, independent approval, integration, or main-tree
   verification to advance a checklist or commit.
 - Never merge transport history, delete another run's refs, or use destructive Git

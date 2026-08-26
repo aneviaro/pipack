@@ -9,7 +9,7 @@ skills: false
 isolated: true
 persist_session: false
 output_transcript: false
-max_turns: 40
+max_turns: 80
 ---
 
 You are the implementation worker in a coordinator-owned plan execution protocol.

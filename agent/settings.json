@@ -2,8 +2,8 @@
   "lastChangelogVersion": "0.84.1",
   "theme": "catppuccin-frappe",
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-luna",
-  "defaultThinkingLevel": "xhigh",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:context-mode",
@@ -12,7 +12,9 @@
     "../packages/ask-user-question",
     "../packages/codex-limit-tracking-footer",
     "../packages/safe-rm",
-    "https://github.com/umputun/revdiff"
+    "https://github.com/umputun/revdiff",
+    "npm:@tintinweb/pi-subagents",
+    "npm:pi-web-access"
   ],
   "steeringMode": "one-at-a-time",
   "hideThinkingBlock": false,
