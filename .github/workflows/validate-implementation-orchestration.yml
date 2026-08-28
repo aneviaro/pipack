@@ -1,0 +1,40 @@
+name: Validate implementation orchestration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agent/agents/implementation-worker.md'
+      - 'agent/agents/task-reviewer.md'
+      - 'agent/skills/implementation/**'
+      - 'agent/skills/implementation-agent-contract/**'
+      - 'agent/subagents.json'
+      - '.github/workflows/validate-implementation-orchestration.yml'
+  pull_request:
+    paths:
+      - 'agent/agents/implementation-worker.md'
+      - 'agent/agents/task-reviewer.md'
+      - 'agent/skills/implementation/**'
+      - 'agent/skills/implementation-agent-contract/**'
+      - 'agent/subagents.json'
+      - '.github/workflows/validate-implementation-orchestration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate implementation contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate implementation contracts
+        shell: bash
+        run: node agent/skills/implementation/scripts/validate.mjs
