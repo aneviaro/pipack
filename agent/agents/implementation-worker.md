@@ -1,13 +1,13 @@
 ---
 description: Implement one supplied plan task in an isolated worktree
 model: openai-codex/gpt-5.6-luna
-thinking: xhigh
+thinking: high
 prompt_mode: replace
 tools: read, bash, edit, write, grep, find, ls
 extensions: false
 skills: false
 isolated: true
-persist_session: false
+persist_session: true
 output_transcript: false
 max_turns: 80
 ---

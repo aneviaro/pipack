@@ -71,9 +71,46 @@ The following invariants apply for the whole run:
 - The coordinator preserves unrelated dirty files byte-for-byte and never stages them.
   The index must be clean at each delegation boundary.
 - Keep only concise worker reports, reviewer findings, verification results, and
-  coordinator decisions in the main conversation/evidence ledger. Never persist raw
-  transcripts, sessions, task packets, credentials, or runtime memory merely for
-  learning.
+  coordinator decisions in the main conversation/evidence ledger. Do not create
+  coordinator-owned transcripts, sessions, task packets, credentials, or runtime
+  memory merely for learning. The package-managed `implementation-worker` session
+  is explicitly persisted so a failed or turn-limited attempt has recoverable state;
+  never copy that raw session into the repository or evidence ledger.
+
+## Recovery checkpoints
+
+Maintain one compact coordinator checkpoint in the main conversation and refresh it
+before and after every worker, reviewer, integration, and commit transition. It must
+contain only:
+
+- plan path, task/attempt/correction number, active branch, task base SHA, and the
+  baseline status/index identity;
+- worker ID/handle, outcome (`running`, `success`, `provider-error`, `turn-limit`,
+  `aborted`, or `unknown`), concise report/error, and any `pi-agent-*` transport
+  branch plus recorded SHA;
+- reviewer decision and accepted/rejected transport ref, or the named gate at which
+  execution stopped; and
+- the single next safe action.
+
+This checkpoint is the coordinator's resume state, not a new repository state file.
+A coordinator turn limit, process restart, or context compaction must resume from
+this checkpoint after re-reading the plan and revalidating Git state. It must not
+restart completed tasks or mutate a checklist from memory.
+
+When an isolated worker fails after making changes, the package may preserve those
+changes on a `pi-agent-*` branch while removing its worktree. Treat that branch and
+its SHA as recovery input, not as an accepted result. A recovery attempt is a fresh
+`implementation-worker` from the unchanged task base whose packet includes the
+validated recovery branch, concise failure/report state, and instructions to restore
+its binary-safe delta with `git diff --binary <base>...<recovery> | git apply` before
+continuing. Validate the recovery branch's ancestry, merge history, path scope, and
+baseline safety before giving it to the new worker. If no safe recovery branch
+exists, restart from the unchanged base with the concise checkpoint only.
+
+Do not use the native `Agent` `resume` operation to continue an isolated
+implementation worker: it reuses the old session/tool working directory and does not
+recreate the required worktree. Persisted sessions are recovery evidence; code-state
+recovery uses a fresh isolated worker and a validated transport-delta handoff.
 
 ## Preflight
 
@@ -140,7 +177,10 @@ that is absent from its worktree. The packet contains, in explicit labeled field
   items; do not stage, commit, amend, merge, rebase, reset, push, or switch the active
   branch; do not edit protected or unexpected paths; do not delegate or invoke nested
   agents; do not write transcripts, sessions, credentials, or persistent memory; and
-  report all changed paths and verification outcomes concisely.
+  report all changed paths and verification outcomes concisely. For a recovery
+  attempt only, the packet may name one validated `pi-agent-*` recovery branch and
+  permit applying its path-limited binary diff with `git apply`; never cherry-pick or
+  merge that branch.
 
 The packet is also the review contract. Save a concise copy in the main conversation
 only as needed for the current run; it is not a file to commit or persist.
@@ -161,13 +201,24 @@ before launching a worker.
 ### 2. Launch the implementation worker
 
 Invoke the installed package's native `Agent` with the exact custom type
-`implementation-worker`, the complete task packet, `isolation: "worktree"`, and
-`foreground` execution (`background: false`). The worker must implement only the
-packet, run its requested checks, and return a concise report containing success or
-failure, changed paths, verification commands/results, and blockers. It must not
-modify the main tree, plan checkboxes, or Git history. The package may automatically
-preserve its completed work as a `pi-agent-*` transport branch and remove the worker
-worktree; that preservation is expected and is not an authoritative commit.
+`implementation-worker`, a unique attempt name, the complete task packet,
+`isolation: "worktree"`, and `foreground` execution (`background: false`). The
+worker must implement only the packet, run its requested checks, and return a
+concise report containing success or failure, changed paths, verification
+commands/results, and blockers. It must not modify the main tree, plan checkboxes,
+or Git history. The package may automatically preserve its completed work as a
+`pi-agent-*` transport branch and remove the worker worktree; that preservation is
+expected and is not an authoritative commit. Record the returned agent ID/handle
+immediately in the coordinator checkpoint.
+
+If the result is a retryable provider failure (including `Codex error: Our servers
+are currently overloaded...`), a worker turn-limit/aborted result, or an incomplete
+result with a preserved transport branch, do not treat it as a fresh task or ask a
+reviewer to approve it. First validate the preserved branch as recovery input, then
+launch a new uniquely named worker from the same base with the recovery packet
+specified above. This is a restart from the saved code state while preserving the
+worker/reviewer gates. A recovery restart does not consume reviewer-correction
+budget; the worker's own turn limit starts fresh.
 
 Initial implementation is always foreground because the next validation depends on
 its branch. Background mode is allowed only for genuinely independent coordinator
@@ -197,10 +248,16 @@ repository:
   SHA, the index is still clean, and every pre-existing baseline path still has its
   captured content/status. Main HEAD or baseline ownership drift blocks the task.
 
-A worker failure, no branch, missing branch, pre-existing ref reuse, merge commit,
-unknown path, protected-path change, failed worker verification, or any mismatch is a
-blocked task. Do not ask the reviewer to bless it and do not mutate a checkbox or
-commit. Retain and report any current-run transport ref for recovery.
+A successful worker result proceeds to review. A worker provider failure,
+turn-limit/aborted result, missing report, or incomplete result is not success and
+must not be reviewed or integrated. If it has a newly created transport branch,
+validate that branch with the same ancestry, no-merge, path-scope, and baseline
+checks, then use it only as recovery input for a fresh worker from the unchanged
+base. If it has no safe branch, restart a fresh worker from that base with the
+checkpoint's concise state. A branch with a scope violation, pre-existing ref reuse,
+merge commit, failed validation, or baseline mismatch is a blocked task: retain and
+report it, do not ask the reviewer to bless it, and do not mutate a checkbox or
+commit.
 
 ### 4. Fresh independent task review
 
@@ -393,9 +450,17 @@ exact state rather than guessing in each of these cases:
 - **Protected branch:** automatic commit mode sees `main` or `master`, a detached
   `HEAD`, or another protected branch. Do not switch branches or create a commit;
   resume on an explicitly supplied feature branch.
-- **Worker failure/no branch:** the worker fails, times out, returns no successful
-  outcome, or no new `pi-agent-*` branch exists. Do not review or integrate; retain any
-  ref and resume with a fresh worker from the same base.
+- **Retryable worker failure or turn limit:** a provider error such as overload,
+  timeout, max-turn abort, or incomplete result is not task failure. Retain the
+  session/error and any new transport ref, validate the ref if present, and restart
+  a fresh isolated worker from the unchanged task base with the recovery packet.
+  Restore the validated binary delta before continuing. This restart does not count
+  against reviewer-correction budget. Never use native `Agent` resume for this
+  isolated worker.
+- **Non-recoverable worker failure/no state:** if no safe transport ref exists, or
+  its validation fails, retain/report the evidence and restart from the unchanged
+  base only when the worker can safely reimplement from the checkpoint; otherwise
+  stop and report the blocker.
 - **Scope violation:** a branch changes an unexpected or protected path, changes the
   plan, or violates packet prohibitions. Reject it before review/integration and
   retain/report the transport ref.
@@ -421,14 +486,21 @@ exact state rather than guessing in each of these cases:
   persist raw transcripts. Resume the final `learn` confirmation/placement flow with
   the concise evidence ledger before claiming completion.
 
-To resume any blocked run, reread the plan, status, and the recorded base/baseline/ref
-state. Treat checked tasks as complete only when repository evidence and their
-authoritative commits agree. Start at the first unchecked task, at the named
-cleanup/final-learning gate when a task commit already succeeded, or at a bounded
-correction cycle explicitly authorized by the user after a review-rejection budget
-stop. In that correction resume, keep the original task base unchanged and pass the
-latest validated rejected branch only as read-only evidence. Never discard user
-changes, rewrite history, or reuse a removed worktree worker.
+To resume any blocked run, reread the plan, the latest coordinator checkpoint,
+status, and the recorded base/baseline/ref state. Treat checked tasks as complete
+only when repository evidence and their authoritative commits agree. Start at the
+first unchecked task, at the named cleanup/final-learning gate when a task commit
+already succeeded, or at a bounded correction cycle explicitly authorized by the
+user after a review-rejection budget stop. For a retryable provider failure or
+worker turn limit, start a fresh isolated worker from the original task base and
+restore only the validated recovery delta; do not reuse the removed worktree or
+native-resume its session. A coordinator turn-limit/process interruption is
+resumable: reopen the main session, read the checkpoint, inspect any live worker
+before launching another, and continue at its single next safe action. It does not
+consume correction budget or justify rerunning an accepted task. In a correction
+resume, keep the original task base unchanged and pass the latest validated
+rejected branch only as read-only evidence. Never discard user changes, rewrite
+history, or infer a gate passed without rechecking it.
 
 ## Final Report
 
