@@ -38,12 +38,19 @@ Produce a plan with:
    - If the spec is ambiguous, make a reasonable assumption and record it in the plan.
    - Use `ask_user_question` only when a product/contract decision blocks planning.
 5. Write or update a Markdown plan.
-6. Confirm the plan is executable by the `implementation` skill:
+6. If the plan was created from a specific item in `docs/backlog.md`, load the
+   `backlog` skill and invoke its `cleanup` option with the exact item heading
+   and saved plan path. Do this immediately after the plan is successfully
+   saved; do not clean up the item if plan creation failed. The cleanup must
+   remove only that item and preserve the remaining backlog.
+7. Confirm the plan is executable by the `implementation` skill:
    - it contains at least one task heading matching `### Task N: <title>` or `### Iteration N: <title>`;
    - every task section contains at least one unchecked checklist item;
    - every task includes verification and observable completion criteria.
-7. Run the `revdiff` skill against the saved plan (`--only <plan-path>`; add `--untracked` for a new file). Process captured annotations and update the plan when needed.
-8. Report the saved file path and no more than three important caveats.
+8. Run the `revdiff` skill against the saved plan (`--only <plan-path>`; add
+   `--untracked` for a new file). Process captured annotations and update the
+   plan when needed.
+9. Report the saved file path and no more than three important caveats.
 
 ## Default Plan Location
 
