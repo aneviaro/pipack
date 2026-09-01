@@ -56,6 +56,30 @@ direct edit. Apply same three-plus-one budget; stop/report when exhausted. Compl
 learning before success. Report plan/branch, commits, decisions, cleanup, verification,
 and unchecked tasks or one resume action.
 
+## Efficiency and stuck-work controls
+
+Reduce latency without weakening any safety or verification gate:
+
+- Classify checks in each packet as fast or expensive. Use focused package/test
+  commands for diagnosis, and run each plan-required race, soak, fuzz, benchmark, or
+  full-build command only at its required gate—never repeat it as an exploratory
+  retry or multiple times within one gate.
+- Bound tool output. Capture verbose test, catalog, and log output in disposable
+  temporary files and return only failures, summaries, and elapsed time. Never copy
+  full generated JSON, logs, or large command output into a packet, recovery handoff,
+  or review request.
+- Preflight dependencies, `GOPROXY`, toolchains, simulator/device availability, and
+  relevant caches before expensive checks. Do not clear caches unless the task
+  explicitly requires it; fail fast on setup blockers.
+- Before an exact edit, re-read the narrow current file region. After an old-text
+  mismatch, do not retry the stale patch. Make expected no-match searches explicit
+  rather than treating them as unexplained failures.
+- If the same setup, test, or contract failure repeats twice without a changed input,
+  stop at that gate and report it; do not spend another correction cycle on an
+  unchanged blocker. Provider, timeout, turn-limit, or output-limit failures instead
+  follow the recovery path immediately with a concise packet and a fresh worker from
+  the unchanged Base SHA.
+
 Every checklist mutation and commit requires a successful worker, validated in-scope
 Base-SHA ref without merges, fresh approval, accepted-tree integration, and passing
 main-tree verification, including every final fix. Never stage early or persist
