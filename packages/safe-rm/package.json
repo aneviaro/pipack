@@ -1,6 +1,6 @@
 {
   "name": "@aneviaro/pi-safe-rm",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "A Pi extension that validates recursive-force rm commands before execution.",
   "type": "module",
   "license": "MIT",
@@ -16,6 +16,7 @@
   ],
   "files": [
     "extensions",
+    "assets",
     "README.md",
     "LICENSE",
     "package.json"

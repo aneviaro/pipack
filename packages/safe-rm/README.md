@@ -2,6 +2,8 @@
 
 Pi extension that intercepts model-issued `bash` calls containing recursive-force `rm` commands (`rm -rf`, `rm -fr`, `rm --recursive --force`, etc.). The first call is blocked with no deletion. The model must call `validate_rm` using the provided request ID, inspect the deletion summary, then retry the exact same command once to approve execution.
 
+![safe-rm validation flow](assets/safe-rm-demo.png)
+
 ## Behavior
 
 - Blocks only model-issued `bash` tool calls; direct user `!`/`!!` shell commands are out of scope.

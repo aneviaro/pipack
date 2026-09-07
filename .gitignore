@@ -64,6 +64,8 @@
 !/packages/safe-rm/
 !/packages/safe-rm/LICENSE
 !/packages/safe-rm/README.md
+!/packages/safe-rm/assets/
+!/packages/safe-rm/assets/**
 !/packages/safe-rm/package.json
 !/packages/safe-rm/package-lock.json
 !/packages/safe-rm/tsconfig.json
