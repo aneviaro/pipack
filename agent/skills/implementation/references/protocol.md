@@ -1,168 +1,160 @@
 # Implementation orchestration protocol
 
-This is the canonical, reusable definition of the implementation protocol. Packets
-carry current task values; this file owns vocabulary, invariants, lifecycle gates,
-correction/recovery rules, and blocked/resume decisions. Do not create a competing
-protocol definition in a packet or role contract.
+This is the canonical definition of implementation lifecycle, safety gates, and
+recovery. Packets carry current task values. Reusable handoff fields live in the
+packet templates.
 
 ## Canonical vocabulary
 
-| Term | Canonical meaning |
+| Term | Meaning |
 | --- | --- |
-| **Base SHA** | The committed `HEAD` captured immediately before a task attempt. Every worker transport tree for that task starts from this commit. |
-| **baseline** | The complete pre-task working-tree and index state: status, paths, and content identity of every pre-existing change. Preserve it byte-for-byte. |
-| **transport ref** | A newly created `pi-agent-*` preservation branch produced by a worker. It is review or recovery input, never accepted history. |
-| **accepted ref** | The one transport ref explicitly approved for the current task after independent review. |
-| **authoritative commit** | The coordinator's task-only commit on the active feature branch, made from the accepted tree delta rather than transport history. |
-| **attempt** | One worker execution for a task: initial, correction, or recovery restart. Number attempts; never resume a removed worktree. |
-| **correction** | A fresh worker execution from the unchanged Base SHA addressing material, in-scope, decision-free review findings. It replaces a rejected ref; the rejected ref is never integrated. |
-| **recovery restart** | A fresh worker from the unchanged Base SHA after provider failure, turn limit, interruption, or incomplete work. It may restore only a validated binary delta from one recovery ref. |
-| **scope reconciliation** | A coordinator validation that adds a worker-reported, previously unlisted tracked path to the final allowed list without restarting, only when it is a minimal adjacent consequence of an explicit task requirement and needs no new decision. |
+| **Base SHA** | Committed `HEAD` captured immediately before a task attempt. |
+| **baseline** | Complete pre-task working-tree/index state and content identity. |
+| **transport ref** | New `pi-agent-*` branch produced by a worker; review/recovery input only. |
+| **accepted ref** | Transport ref approved by a completed revmux review. |
+| **authoritative commit** | Coordinator task-only commit made from the accepted tree delta. |
+| **attempt** | Initial, correction, or recovery worker execution for one task. |
+| **correction** | Fresh worker from unchanged Base SHA addressing material, decision-free findings. |
+| **recovery restart** | Fresh worker from unchanged Base SHA after provider, turn-limit, or interruption failure. |
+| **revmux task/round** | Temporary external-review archive and one review execution within it. |
+| **worker reasoning** | Coordinator-selected `thinking` level: `medium`, `high`, or `xhigh`; default `high`. |
 
 ## Invariants and ownership
 
-- Tasks are sequential. The coordinator alone owns the plan/checklist, index, active
-  branch, integration, authoritative commits, and transport-ref cleanup.
-- The index is clean at every delegation boundary. Active branch, `HEAD`, Base SHA,
-  and baseline remain unchanged until an approved delta is integrated.
-- A valid transport ref is newly created, descends from Base SHA, has no merge commits,
-  agrees with the worker report, and changes only initially allowed paths plus any
-  paths that pass bounded scope reconciliation. Hard-protected paths are immutable.
-- A fresh independent read-only review is required before integration. Main-tree
-  verification is required before checklist mutation or an authoritative commit.
-- Integration applies the path-limited binary delta, not a worker commit or merge.
-  One accepted task produces one task-only authoritative commit.
+- Tasks and each task's worker/revmux cycle are sequential. Never overlap a worker with
+  the revmux review of the ref it may replace: review only immutable transport trees. The
+  coordinator alone owns plan/checklist state, the main index, active branch, integration,
+  authoritative commits, and `pi-agent-*` cleanup.
+- The worker model, tools, isolation, and role remain fixed. The coordinator chooses one
+  allowed worker reasoning level per attempt, records it in the packet/checkpoint, and
+  passes it explicitly to `Agent`; `high` is the default.
+- The index is clean at every delegation boundary. Active branch, `HEAD`, Base SHA, and
+  baseline remain unchanged until an approved delta is integrated.
+- A valid transport ref is new, descends from Base SHA, has no merge commits, agrees with
+  the worker report, and changes only allowed paths plus bounded scope additions. Protected
+  paths are immutable.
+- Revmux is an external, read-only review service for this workflow. It may inspect the
+  exact transport ref but must not edit source, mutate Git, update checklists, or commit.
+  Its task archive and reports live in a temporary directory outside the repository.
+- A completed, non-degraded revmux report with no blocking findings or questions is the
+  required independent approval before integration. Revmux exit `0` (no findings) and `1`
+  (findings reported) both mean the pipeline completed; exit `2` is a tool failure.
+- Integration applies a path-limited binary delta, never a worker commit or merge. One
+  accepted task produces one authoritative task-only commit.
 - Failed, rejected, or interrupted runs retain relevant transport refs. Cleanup is
-  compare-and-delete only for refs created by this run and only after a successful
-  task commit.
-- Learning is a final gate, but raw transcripts, sessions, credentials, and evidence
-  files are never persisted.
+  compare-and-delete only for refs created by this run and only after a successful commit.
 
 ## Lifecycle and durable-mutation gates
 
 A first-pass success follows:
-`Ready → Delegated → Worker validated → Review requested → Reviewed → Integrated →
-Verified → Recorded → Committed → Cleaned → Learned`.
+`Ready → Delegated → Worker validated → Review requested → Reviewed → Integrated → Verified → Recorded → Committed → Cleaned → Learned`.
 
-The correction path is explicit and optional:
-`Review requested → Correcting → Delegated → Worker validated → Review requested`.
-A reviewer requesting changes enters `Correcting`; it does not enter `Reviewed` and
-cannot integrate. After a fresh correction worker is validated, a fresh reviewer is
-required. A first-pass approval can skip `Correcting`. **Reviewed means approval
-only**, never merely that inspection occurred. Recovery restarts at `Delegated` from
-the unchanged Base SHA and are not corrections.
-
-| State | Entry condition and required transition gates | Durable mutation permitted |
+| State | Required gates | Durable mutation permitted |
 | --- | --- | --- |
-| **Ready** | First unchecked task; read plan/spec/guidance; capture branch, Base SHA, baseline, clean index, initially allowed paths, and exact hard-protected paths | None |
-| **Delegated** | Ready gates pass; launch one foreground worker from committed Base SHA, or a fresh recovery/correction worker from that same Base SHA | None |
-| **Worker validated** | Worker reports success; a new transport ref exists; ancestry, no-merges, path/report agreement, requested checks, branch, Base SHA, index, and baseline validate; every changed path is initially allowed or passes bounded scope reconciliation | None |
-| **Review requested** | Worker validated; hand the exact ref/tree, initial and final allowed lists, reconciliation evidence, and complete packet to a fresh read-only reviewer | None |
-| **Correcting** | Reviewer returns `request changes` with material, task-scoped, decision-free findings; keep Base SHA and baseline unchanged and remain within correction budget | None |
-| **Reviewed** | Fresh reviewer inspects the complete current ref and returns decisive `approve`; any rejected ref remains unaccepted | None |
-| **Integrated** | Reviewed approval; recheck branch/Base SHA/index/baseline/ref; apply only the accepted path-limited delta and inspect staged names, content, and diff check | Accepted task paths may be staged; no checklist or commit mutation |
-| **Verified** | Integrated; every task command passes in the main tree and protected paths remain unchanged | None until every check passes |
-| **Recorded** | Verified; reread completion criteria and confirm every required step is observable | Change only current-task checkboxes; then stage task files plus the plan |
-| **Committed** | Recorded and staged; inspect staged scope/check and create one task-only authoritative commit on the active feature branch | Authoritative commit; capture new Base SHA and clean baseline |
-| **Cleaned** | Authoritative commit succeeded; compare each run-created ref's recorded SHA, then delete atomically and verify absence | Transport cleanup only; retain/report any mismatch |
-| **Learned** | Cleaned and evidence is concise; invoke learning under its confirmation and placement rules | Only user-confirmed learning changes, outside the task commit |
+| **Ready** | Select first unchecked task; read plan/spec/guidance; capture branch, Base SHA, baseline, clean index, allowed/protected paths, checks, and worker reasoning level. | None |
+| **Delegated** | Worker, revmux, and configured child CLIs available; launch fresh worker from committed Base SHA. | None |
+| **Worker validated** | Success report; new ref; ancestry/no-merges; report/path agreement; requested checks; branch/Base SHA/index/baseline; scope. | None |
+| **Review requested** | Create temporary revmux task/round, write scope/goal from returned paths, and hand the exact ref and evidence to revmux. | None |
+| **Reviewed** | Revmux exit 0/1; valid required JSON; all expected sources reported; no degraded/unverified source or unresolved question; findings are empty after confirmed/refined findings are handled. | None |
+| **Integrated** | Recheck branch/Base SHA/index/baseline/ref and review result; apply accepted path-limited delta; inspect staged names/content/check. | Accepted task paths may be staged; no checklist/commit mutation. |
+| **Verified** | Every task command passes in the main tree; protected paths remain unchanged. | None until all checks pass. |
+| **Recorded** | Reread completion criteria; every required step is observable. | Change only current-task checkboxes, then stage plan plus task files. |
+| **Committed** | Recorded and staged; staged scope/check passes. | One authoritative task-only commit on feature branch. |
+| **Cleaned** | Commit succeeded; recorded ref SHAs still match. | Compare-delete this run's refs and remove temporary revmux archive. |
+| **Learned** | Concise evidence ledger and clean-up outcome. | Only user-confirmed learning changes. |
 
-Every durable mutation is gated by the preceding validation, independent approval,
-integration, and main-tree verification requirements. A correction never integrates
-its rejected ref. A recovery restart never uses native agent resume and never changes
-the original Base SHA.
+A correction enters `Correcting`, uses the unchanged Base SHA and complete original worker
+packet plus only material task-scoped findings, then returns through worker validation and a
+fresh revmux round. The worker must either fix each finding or provide a concrete `Review
+response` for every unchanged finding; the coordinator passes that response into the next
+revmux goal but cannot dismiss a finding on the worker's say-so. A rejected ref is never
+integrated. A recovery restart may restore only a validated binary delta and does not consume
+correction budget.
+
+Track consecutive correction cycles whose transport tree is byte-identical to the preceding
+reviewed candidate as `no_change_cycles`. Reset it when the worker changes the candidate
+and the change is validated. Stop/report with the checklist unchecked at three consecutive
+no-change cycles, even if the ordinary correction budget has room; retain the refs, reports,
+and worker responses for an explicit user decision.
 
 ## Bounded scope reconciliation
 
-Initial allowed paths are a strong preflight expectation, not a reason to discard an
-otherwise valid implementation for a mechanical omission. Hard-protected paths remain
-a frozen safety boundary. Before review, the coordinator may add a changed path to the
-final allowed list without restarting only when every condition below holds:
+Before revmux, the coordinator may add a changed path to the final allowed list only when:
 
-1. The worker listed the path under `Scope additions requested`, listed it under
-   `Changed paths`, and gave a concrete necessity tied to an explicit task requirement.
-2. The path is tracked, was clean in the baseline, is not hard-protected, and is not a
-   generated artifact, plan/checklist, credential/session/runtime file, Git metadata,
-   dependency or lockfile change, or unrelated configuration.
-3. The coordinator inspects the complete path diff and confirms it is a minimal
-   adjacent consequence needed to compile, test, document, or expose the explicitly
-   required behavior. It introduces no new product, architecture, security,
-   dependency, compatibility, or scope decision and contains no opportunistic cleanup.
-4. The complete ref still passes ancestry, no-merge, path/report, diff-check,
-   verification-evidence, branch, index, and baseline gates.
-5. The coordinator records the initial list, each added path and rationale, and the
-   final allowed list in the checkpoint and review packet. The fresh reviewer must
-   independently verify necessity and scope before approval.
+1. The worker lists it under both `Changed paths` and `Scope additions requested`, with a
+   concrete necessity tied to an explicit task requirement.
+2. It is tracked, clean in the baseline, not protected/generated/plan/checklist/
+   credential/runtime/Git metadata/dependency/lockfile/unrelated configuration.
+3. The complete diff is minimal and mechanically required to compile, test, document, or
+   expose the required behavior, with no new product, architecture, security, dependency,
+   compatibility, or scope decision.
+4. All ref, report, diff-check, verification, branch, index, and baseline gates pass.
+5. The initial list, addition rationale, inspection evidence, and final list are recorded
+   in the checkpoint and revmux packet.
 
-There is no arbitrary file-count cutoff: every addition must pass individually, while
-any broad package expansion is evidence that the task was under-scoped and must stop.
-Reconciliation is a validation step, not permission to silently widen scope, repair a
-failed worker, excuse an omitted report path, or accept generated output. It does not
-consume correction budget and does not require a worker restart. If any changed path
-fails these conditions, reject the ref before review and use the scope-violation row
-below.
+There is no arbitrary file-count cutoff. Any broad expansion is under-scoped work and must
+stop. A missing worker report path or any failed condition is a scope violation, not a
+reconciliation opportunity.
 
-Examples:
+## Revmux review contract
 
-- Eligible: a version-bump task changes an adjacent test with a hardcoded old version,
-  or exports the required schema constant from the package's existing types file, and
-  the worker reports why.
-- Ineligible: release artifacts appear in the ref, a changed path is absent from the
-  worker report, a plan/checklist changes, a dependency/lockfile changes without prior
-  approval, or the extra path contains an unrelated refactor.
+For each review, use a new temporary tasks directory and the exact absolute paths emitted
+by `revmux new`; never construct paths or create `.revmux/` in the repository. Write a
+short `scope.md` containing the Base-SHA-to-transport-ref commands, scale, complete changed
+file list, and explicit read-only/protected-path rules. Write `goal.md` with the task goal,
+completion criteria, and a material-finding severity bar. Invoke revmux with `--workdir`
+set to the repository, `--tasks-dir` set outside it, `--task`, `--run`, `--profile
+comprehensive`, and `--no-tui`, capturing stdout separately from stderr.
+
+Validate the report before approval: `scope.task`/`run`, `sources.expected` equals
+`sources.reported`, `sources.degraded` is empty, all four result lists are arrays, each
+finding has a path/line/severity/confidence/title/body/fix/verdict, and `stats` exists.
+Treat confirmed/refined findings as correction requests. Treat non-empty `open_questions`,
+any unverified finding, malformed JSON, missing fields, degraded sources, exit `2`, or a
+failed post-review baseline check as blocked. Record `pre_existing` and `immaterial` but
+do not turn them into corrections. Recheck the repository after the run because revmux
+subprocesses are not authorized to mutate it.
 
 ## Correction and recovery rules
 
-The initial worker may have at most three fresh correction workers after it. Each
-correction uses the unchanged Base SHA, a new transport ref, the complete original
-packet, and only material task-scoped findings requiring no new decision. After that
-budget, stop; one additional bounded cycle requires explicit user authorization at
-resume time. A correction worker is fresh and independent, as is its reviewer.
-
-For provider/turn-limit/incomplete work, retain concise failure state and any ref.
-Validate ancestry, merge history, and path scope, then start a fresh worker from Base
-SHA. If safe, restore its path-limited binary delta with:
+The initial worker may have at most three fresh correction workers. One additional bounded
+cycle requires explicit user authorization after a blocked resume. Every correction starts
+from the unchanged Base SHA and gets a fresh worker and revmux round; preserve the temporary
+archive until the task is committed or the run is stopped. Provider/turn-limit/incomplete
+worker failures use a fresh recovery worker, never native resume. If a recovery ref is safe,
+restore only:
 
 ```sh
 git diff --binary <base>...<recovery> | git apply
 ```
 
-Never cherry-pick, merge, or native-resume the removed worktree. If no safe ref exists,
-restart from Base SHA without recovery state. Recovery does not consume correction
-budget.
+Do not cherry-pick, merge, rebase, or use transport history.
 
 ## Blocked / resume decision matrix
 
-Stop with current-task items unchecked unless a row explicitly permits resumption.
-Retain exact refs and concise evidence; never infer that a gate passed.
-
-| Blocked condition | Required blocked action | Resume rule / next safe action |
+| Blocker | Required action | One safe resume action |
 | --- | --- | --- |
-| Unavailable or malformed worker/reviewer | Do not fall back to another agent type; retain state | Restore the named agent and revalidate preflight, then launch the missing gate |
-| Provider error, turn-limit, or incomplete worker | Do not review or integrate; retain error/session state and validate any new ref | Recovery restart from unchanged Base SHA with a validated binary delta, or fresh restart if none |
-| Unreconcilable scope violation | Reject before review/integration; retain the offending ref and report each path and failed reconciliation condition | Resolve task scope, then restart from unchanged Base SHA with a corrected packet; do not restart when every extra path passed bounded reconciliation |
-| Exhausted review budget | Leave current-task items unchecked; retain relevant refs and findings | User explicitly authorizes one bounded correction, or supplies corrected task inputs |
-| Active branch, `HEAD`, index, or baseline drift | Stop before integration, checklist, or commit | Owner restores/records intended state; revalidate Base SHA and baseline |
-| Integration conflict or verification failure | Do not mutate checklist or commit; preserve accepted ref and failing command | Owner repairs main tree, reruns every requested command, and reapplies/revalidates accepted delta |
-| Cleanup mismatch (missing/changed ref or failed compare-and-delete) | Do not force-delete or touch another run's ref; report expected and actual SHA | Ref owner resolves mismatch; compare-and-delete only at recorded SHA |
-| Interrupted learning | Do not undo or rerun accepted task work; do not persist raw evidence | Resume learning confirmation/placement with concise evidence ledger |
+| Missing/malformed worker or revmux/CLI | Do not fall back; retain state. | Restore the named dependency and revalidate preflight. |
+| Provider/turn-limit/incomplete worker | Do not review/integrate; retain ref/error. | Fresh recovery worker from unchanged Base SHA, with validated binary delta if safe. |
+| Revmux exit 2, invalid report, degraded source, or failed baseline check | Do not integrate; retain ref and report. | Fix the environment/input or re-run a fresh round from the same validated ref. |
+| Confirmed/refined finding or unresolved open question | Do not integrate; retain accepted candidate as unaccepted. | Apply only decision-free fixes with a fresh correction worker; ask the user for questions. |
+| Unreconcilable scope | Reject before review/integration; retain offending ref. | Resolve scope, then restart from unchanged Base SHA with corrected packet. |
+| Exhausted review budget | Leave checklist unchecked and retain refs/findings. | User authorizes one bounded correction or supplies corrected inputs. |
+| Three consecutive no-change correction cycles | Stop automatic correction; leave checklist unchecked and retain refs/reports/responses. | User supplies a decision or explicitly authorizes a bounded next action. |
+| Invalid worker reasoning selection | Do not delegate; retain state. | Choose `medium`, `high`, or `xhigh`, record it, and revalidate preflight. |
+| Branch, `HEAD`, index, or baseline drift | Stop before integration/checklist/commit. | Restore or record intended state, then revalidate identifiers. |
+| Integration conflict or verification failure | Preserve accepted ref; do not record/commit. | Repair main tree, rerun all checks, and reapply/revalidate the accepted delta. |
+| Cleanup mismatch | Do not force-delete or touch another run's ref. | Compare-delete only at the recorded SHA after resolving ownership. |
+| Interrupted learning | Do not undo task work or persist raw evidence. | Resume the learning confirmation/placement step. |
 
-After any resume, reread the plan and checkpoint, inspect status, and revalidate the
-recorded identifiers before taking the one named safe action.
+After resume, reread the plan and checkpoint, inspect status, and revalidate the recorded
+identifiers before taking exactly the named safe action.
 
-## Contract ownership note
+## Contract ownership
 
-Each contract has one canonical owner:
-
-- `references/protocol.md` owns vocabulary, invariants, lifecycle/gates, bounded scope
-  reconciliation, correction/recovery, and the blocked/resume matrix.
-- `implementation-agent-contract/SKILL.md` owns role-neutral packet precedence,
-  scope protection, no-delegation/no-persistence rules, and concise reporting.
-- `assets/task-packet.md` owns implementation-worker handoff fields and the exact
-  worker result schema.
-- `assets/review-packet.md` owns task-reviewer evidence fields, inspection/coverage,
-  and the exact reviewer result schema.
-- `assets/checkpoint.md` owns the compact coordinator resume-state shape.
-
-When changing a contract, edit its canonical owner and link to it rather than copying
-a second definition elsewhere.
+- This file owns vocabulary, invariants, lifecycle gates, scope reconciliation, revmux
+  review semantics, correction/recovery, and the blocked/resume matrix.
+- `implementation-agent-contract/SKILL.md` owns worker packet precedence and worker safety.
+- `assets/task-packet.md` owns implementation-worker handoff, correction response, and result schema.
+- `assets/review-packet.md` owns revmux paths, invocation, JSON validation, and classification.
+- `assets/checkpoint.md` owns compact coordinator resume state.

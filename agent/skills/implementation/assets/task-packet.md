@@ -15,6 +15,7 @@ repository.
 - Plan path: `<plan path>`
 - Source-spec path: `<source-spec path>`
 - Attempt: `<initial | correction N | recovery restart N>`
+- Worker reasoning: `<medium | high | xhigh>` (coordinator-selected; default `high`)
 - Existing baseline: `<complete status, index state, path list, and content identity; preserve byte-for-byte>`
 
 ## Task contract
@@ -78,7 +79,10 @@ Hard-protected baseline status/content: `<identity to recheck before reporting>`
 Inspect before editing. Keep implementation minimal and generic. Do not infer missing
 requirements from other conversations. Do not modify a hard-protected path to make a
 check pass. A scope addition must be explicit in the result and satisfy the bounded
-rule above; otherwise stop and report the blocker.
+rule above; otherwise stop and report the blocker. For a correction, address each
+revmux finding. If no change is warranted, explain the concrete rebuttal under
+`Review response`; the coordinator may pass it to a fresh revmux round but may not
+silently dismiss the finding.
 
 ## Verification
 
@@ -96,7 +100,8 @@ failed, or unverifiable commands as such and use a failure result.
 
 ## Prohibitions
 
-- Implement only this task; do not re-plan it or edit plan/checklist files.
+- Implement only this task; do not re-plan it or edit plan/checklist files. Use only the
+  coordinator-selected worker reasoning level supplied in the identity section.
 - Do not stage, commit, amend, merge, rebase, reset, push, switch branches, or
   mutate Git history or refs.
 - Do not edit, create, delete, rename, or generate a hard-protected path. Do not
@@ -123,6 +128,8 @@ Changed paths:
 - <every exact changed path, or none>
 Scope additions requested:
 - none or <path> — <explicit task requirement and why this adjacent change is mechanically necessary>
+Review response:
+- none, or <concise response to each revmux finding that was not changed>
 Implementation summary:
 - <concise item>
 Verification:

@@ -1,19 +1,20 @@
 ---
 name: implementation
-description: Run a grounded implementation plan through guarded worker, review, integration, and verification gates.
+description: Run a grounded implementation plan through guarded worker, revmux review, integration, and verification gates.
 ---
 
 # Implementation
 
-The Pi coordinator owns checklists, index, commits, and cleanup.
-See [protocol](references/protocol.md), [worker packet](assets/task-packet.md),
-[review](assets/review-packet.md), [checkpoint](assets/checkpoint.md), and [agent
-contract](../implementation-agent-contract/SKILL.md).
+The Pi coordinator owns checklists, refs, commits, cleanup, and learning. The
+implementation worker is a Pi subagent; review is performed by the external
+`revmux` CLI. Read [protocol](references/protocol.md), [worker packet](assets/task-packet.md),
+[revmux packet](assets/review-packet.md), [checkpoint](assets/checkpoint.md), and the
+[worker contract](../implementation-agent-contract/SKILL.md) before running a task.
 
 ## State machine
 
 For one pending task, run:
-`select → preflight → render packet → worker → validate ref → review/correct → integrate → verify → record → cleanup → learn`.
+`select → preflight → render packet → worker → validate ref → revmux review/correct → integrate → verify → record → cleanup → learn`.
 
 - **Select:** use the user's plan path; otherwise search the plan directory, then
   `docs/plans/`, `docs/implementation/`, and `docs/implementation-plan.md` for active
@@ -22,70 +23,61 @@ For one pending task, run:
   if none, ask for a path. Require `### Task N:`/`### Iteration N:` and use the first
   unchecked section.
 - **Preflight:** read plan/spec/guidance; capture branch, Base SHA, status/index/baseline,
-  existing `pi-agent-*` refs, exact agents, initial allowed paths, frozen hard-protected
-  paths, and checks. Require clean index and committed HEAD; refuse `main`/`master`,
-  detached/protected branches, drift, ambiguity, unavailable agents, or baseline
-  conflicts. Stop without mutating baseline.
+  existing `pi-agent-*` refs, exact worker, revmux, and required child-CLI availability,
+  initial allowed paths, frozen hard-protected paths, checks, and the selected worker
+  reasoning level. Require clean index and
+  committed HEAD; refuse `main`/`master`, detached/protected branches, drift, ambiguity,
+  unavailable worker/revmux/CLI, or baseline conflicts. Stop without mutating baseline.
 - **Render packet/worker:** fill the worker packet in memory with context, scope,
-  prohibitions, and checks. Use exact custom types, fresh foreground workers, no
-  polling. Recovery restarts restore only a validated binary delta from the unchanged
-  Base SHA; never resume or merge transport history. Validate success, new ref,
-  ancestry/no merges, report/path agreement, checks, branch, and baseline. Reconcile a
-  reported, minimal, mechanically required adjacent tracked path under the protocol's
-  bounded scope-reconciliation gate instead of restarting solely because preflight
-  omitted it; reject every unreconcilable scope change.
-- **Review/correct:** fill the review packet and launch a fresh foreground read-only
-  `task-reviewer`; only `approve` passes. Material,
-  task-scoped, decision-free rejection gets a fresh Base-SHA worker and reviewer.
-  Reviewer-requested corrections, including final whole-plan review fixes, allow at
-  most three fresh correction workers after the initial attempt/review, plus one
-  explicitly user-authorized extra after a blocked resume. Provider/turn-limit failure
-  uses recovery, never resume. Stop/report when the correction budget is exhausted.
-- **Integrate/verify:** stop on malformed review, unreconciled scope, baseline/branch
-  drift, or any blocker; retain refs and leave checklists unchecked. Recheck gates,
-  apply only the accepted final-allowed-path tree delta (never transport history),
-  inspect staged scope, content/check, then run every requested main-tree/native check.
-- **Record/cleanup/learn:** after verification change only current-task checkboxes and
-  make one task-only authoritative commit. Atomically compare-delete only this run's
-  refs, invoke
-  `learn` with concise evidence, and report cleanup mismatches.
+  prohibitions, and checks. Use the exact custom worker type, choose `thinking` explicitly
+  from `medium`, `high`, or `xhigh` (default `high`), and use fresh foreground worktree
+  execution with no polling. Recovery restarts restore only a validated binary delta from
+  the unchanged Base SHA; never resume or merge transport history. Validate success, new
+  ref, ancestry/no merges, report/path agreement, checks, branch, and baseline. Reconcile
+  a reported minimal adjacent tracked path under the protocol's bounded gate instead of
+  restarting solely because preflight omitted it; reject every unreconcilable scope change.
+- **Revmux review/correct:** create a temporary tasks directory outside the repository,
+  use the paths returned by `revmux new`, write a complete scope and goal, and run a fresh
+  `revmux` JSON review against the exact transport ref. Revmux must run with `--workdir`
+  set to the repository and its archive must remain in the temporary directory. Keep the
+  worker and review sequential: revmux reviews immutable transport trees, never a live
+  worker candidate. Exit 0 or 1 is a completed report; exit 2, invalid/missing JSON, a
+  degraded source, an unverified finding, or an unresolved open question blocks approval.
+  Revmux-requested corrections use a fresh worker from the unchanged Base SHA and a fresh
+  revmux round. The worker may push back with a concrete `Review response`, which is passed
+  to the next revmux goal but never silently accepted. Track unchanged candidates and
+  stop/report after three consecutive no-change cycles. Record the chosen reasoning level in
+  the packet and checkpoint. Otherwise allow at most three fresh correction workers after
+  the initial attempt, plus one explicitly user-authorized extra cycle after a blocked
+  resume. Stop/report when the correction budget is exhausted.
+- **Integrate/verify:** stop on malformed review, unreconciled scope, baseline/branch drift,
+  or any blocker; retain refs and leave checklists unchecked. Recheck gates, apply only the
+  accepted final-allowed-path tree delta (never transport history), inspect staged scope,
+  content/check, and run every requested main-tree/native check.
+- **Record/cleanup/learn:** after verification change only current-task checkboxes and make
+  one task-only authoritative commit. Compare-delete only this run's refs, remove the
+  temporary revmux directory outside the repository, invoke `learn` with concise evidence,
+  and report cleanup mismatches.
 
-When no tasks remain, run cross-task gates and verify history, index, and files before
-the final whole-plan review. A requested final fix uses a fresh isolated worker for the affected task,
-from its task base, full worker-result/ref validation, fresh review, accepted-tree
-integration, main-tree verification, and a separate authoritative fix commit—never a
-direct edit. Apply same three-plus-one budget; stop/report when exhausted. Complete
-learning before success. Report plan/branch, commits, decisions, cleanup, verification,
-and unchecked tasks or one resume action.
+## Safety and efficiency
 
-## Efficiency and stuck-work controls
+Preserve sequential tasks, clean-index boundaries, unrelated dirty files, committed-HEAD
+worktree bases, ancestry/no-merge/path checks, independent revmux review, main-tree
+verification, bounded corrections, and one authoritative task commit. Never let revmux
+edit source, integrate refs, update checklists, or commit. Never persist packets,
+transcripts, credentials, or runtime state in a repository. Bound verbose output and do
+not repeat expensive checks during retries. If the same unchanged setup/test/contract
+failure repeats twice, stop and report it. Provider, timeout, turn-limit, or output-limit
+failures use recovery, not native resume.
 
-Reduce latency without weakening any safety or verification gate:
-
-- Classify checks in each packet as fast or expensive. Use focused package/test
-  commands for diagnosis, and run each plan-required race, soak, fuzz, benchmark, or
-  full-build command only at its required gate—never repeat it as an exploratory
-  retry or multiple times within one gate.
-- Bound tool output. Capture verbose test, catalog, and log output in disposable
-  temporary files and return only failures, summaries, and elapsed time. Never copy
-  full generated JSON, logs, or large command output into a packet, recovery handoff,
-  or review request.
-- Preflight dependencies, `GOPROXY`, toolchains, simulator/device availability, and
-  relevant caches before expensive checks. Do not clear caches unless the task
-  explicitly requires it; fail fast on setup blockers.
-- Before an exact edit, re-read the narrow current file region. After an old-text
-  mismatch, do not retry the stale patch. Make expected no-match searches explicit
-  rather than treating them as unexplained failures.
-- Do not restart a successful worker solely for an omitted adjacent tracked path when
-  it passes bounded scope reconciliation. Record the path and rationale, add it to the
-  final allowed list, and send that evidence to the reviewer.
-- If the same setup, test, or contract failure repeats twice without a changed input,
-  stop at that gate and report it; do not spend another correction cycle on an
-  unchanged blocker. Provider, timeout, turn-limit, or output-limit failures instead
-  follow the recovery path immediately with a concise packet and a fresh worker from
-  the unchanged Base SHA.
+When no tasks remain, run cross-task gates and verify history, index, and files before the
+final whole-plan revmux review. A requested final fix uses a fresh worker from its task
+base, full ref validation, a fresh revmux round, accepted-tree integration, main-tree
+verification, and a separate authoritative fix commit. Apply the same three-plus-one
+budget; stop/report when exhausted. Complete learning before success.
 
 Every checklist mutation and commit requires a successful worker, validated or
-scope-reconciled Base-SHA ref without merges, fresh approval, accepted-tree integration, and passing
-main-tree verification, including every final fix. Never stage early or persist
-packets, transcripts, sessions, credentials, or runtime state.
+scope-reconciled Base-SHA ref, a completed non-degraded revmux report with no blocking
+findings or questions, accepted-tree integration, and passing main-tree verification.
+Report plan/branch, commits, review task/run, decisions, cleanup, verification, and
+unchecked tasks or one resume action.

@@ -5,18 +5,18 @@ on:
     branches: [main]
     paths:
       - 'agent/agents/implementation-worker.md'
-      - 'agent/agents/task-reviewer.md'
       - 'agent/skills/implementation/**'
       - 'agent/skills/implementation-agent-contract/**'
       - 'agent/subagents.json'
+      - 'README.md'
       - '.github/workflows/validate-implementation-orchestration.yml'
   pull_request:
     paths:
       - 'agent/agents/implementation-worker.md'
-      - 'agent/agents/task-reviewer.md'
       - 'agent/skills/implementation/**'
       - 'agent/skills/implementation-agent-contract/**'
       - 'agent/subagents.json'
+      - 'README.md'
       - '.github/workflows/validate-implementation-orchestration.yml'
 
 permissions:

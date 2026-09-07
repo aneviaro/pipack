@@ -10,7 +10,7 @@ configuration: settings, custom skills, and npm dependency manifests.
 | `agent/settings.json` | Default provider + model, theme, `packages[]` list |
 | `agent/mcp-onboarding.json` | Onboarding flags |
 | `agent/skills/` | Custom skills |
-| `agent/agents/` | `implementation-worker` and `task-reviewer` definitions |
+| `agent/agents/` | `implementation-worker` definition |
 | `agent/subagents.json` | Fail-closed subagent defaults and runtime policy |
 | `agent/npm/package.json` (+ lock) | pi npm extensions manifest, including `@tintinweb/pi-subagents` |
 | `packages/ask-user-question/` | Published `ask_user_question` Pi package |
@@ -20,26 +20,39 @@ configuration: settings, custom skills, and npm dependency manifests.
 
 ### Orchestrated implementation
 
-The global implementation workflow is backed by `@tintinweb/pi-subagents`. Its
-tracked configuration preserves the same agent policy after restoration:
+The global implementation workflow uses `@tintinweb/pi-subagents` for the coding
+worker and `revmux` for independent review. Its tracked configuration preserves the
+worker policy after restoration:
 
 | Path | What |
 |------|------|
-| `agent/agents/` | `implementation-worker` and `task-reviewer` definitions |
-| `agent/subagents.json` | Fail-closed subagent defaults and runtime policy |
+| `agent/agents/implementation-worker.md` | Isolated coding worker definition |
+| `agent/subagents.json` | Fail-closed worker dispatch and runtime policy |
 | `agent/npm/package.json` (+ lock) | Includes the `@tintinweb/pi-subagents` runtime dependency |
 
-For each plan item, the coordinator owns durable state and Git authority. The
-high-level lifecycle is:
+Install `revmux` separately before using the implementation skill:
 
-`task packet → isolated worker → read-only review → coordinator verification → checklist update → feature-branch commit`
+```bash
+brew install umputun/apps/revmux             # macOS
+# or install github.com/umputun/revmux/app with Go
+```
 
-Workers use isolated worktrees, reviewers are read-only, and the coordinator
-controls integration and cleanup. The [implementation skill](agent/skills/implementation/SKILL.md)
-and its [protocol](agent/skills/implementation/references/protocol.md) are
-canonical; the [task packet](agent/skills/implementation/assets/task-packet.md),
-[review packet](agent/skills/implementation/assets/review-packet.md), and
-[shared agent contract](agent/skills/implementation-agent-contract/SKILL.md)
+Revmux also requires whichever authenticated `claude` and `codex` CLIs its selected
+profile uses. It reviews only: the coordinator still owns Git, integration, checklist
+updates, commits, and cleanup. The worker's model, tools, and isolation stay fixed while
+the coordinator chooses `medium`, `high`, or `xhigh` reasoning per attempt (`high` by
+default). Runtime task directories, reports, and transcripts are created in a temporary
+directory outside the reviewed repository and removed after the workflow finishes.
+
+For each plan item, the high-level lifecycle is:
+
+`task packet → isolated implementation-worker → temporary revmux review → coordinator verification → checklist update → feature-branch commit`
+
+The [implementation skill](agent/skills/implementation/SKILL.md) and its
+[protocol](agent/skills/implementation/references/protocol.md) are canonical; the
+[task packet](agent/skills/implementation/assets/task-packet.md),
+[revmux packet](agent/skills/implementation/assets/review-packet.md), and
+[shared worker contract](agent/skills/implementation-agent-contract/SKILL.md)
 contain the detailed handoff contracts.
 
 This is a public configuration repository: tracked artifacts are limited to
