@@ -16,6 +16,7 @@ baseline_status_identity: <concise status/index/content identity>
 worker: <agent ID/handle>
 outcome: <running|success|provider-error|turn-limit|aborted|unknown>
 worker_outcome: <one concise result or error>
+scope_reconciliation: <none, pending, rejected, or final added paths with concise rationale>
 retained_transport_refs:
   - <pi-agent-* ref @ recorded SHA, or none>
 review: <pending|approve|request changes|unavailable|not applicable>

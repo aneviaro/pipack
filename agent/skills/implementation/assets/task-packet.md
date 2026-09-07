@@ -46,32 +46,39 @@ there are none>`
 
 ## Scope
 
-### Allowed paths
+### Initially allowed paths
 
-Create or change only these exact paths:
+These paths are pre-approved:
 
 - `<exact allowed path 1>`
 - `<exact allowed path 2>`
 
 Permitted generated artifacts: `<none, or exact paths and generation rule>`
 
-### Protected paths
+A worker may change an unlisted tracked path only when it is a minimal adjacent change
+mechanically required by an explicit task requirement, requires no new product,
+architecture, security, dependency, or scope decision, and is not hard-protected
+below. List every such path and its necessity under `Scope additions requested`.
+This is not permission for opportunistic cleanup or related refactoring.
 
-Do not change these paths or any pre-existing dirty path:
+### Hard-protected paths
 
-- `<exact protected path 1>`
-- `<exact protected path 2>`
-- `<all plan/checklist, coordinator, configuration, and unrelated paths as applicable>`
+Never change these paths or any pre-existing dirty path:
 
-Protected baseline status/content: `<identity to recheck before reporting>`
+- `<exact hard-protected path 1>`
+- `<exact hard-protected path 2>`
+- `<all plan/checklist, coordinator-owned, credential, runtime-state, and unrelated baseline paths as applicable>`
+
+Hard-protected baseline status/content: `<identity to recheck before reporting>`
 
 ## Required implementation behavior
 
 `<precise task-specific instructions and decisions already made>`
 
 Inspect before editing. Keep implementation minimal and generic. Do not infer missing
-requirements from other conversations or silently expand the allowed paths. Do not
-modify a protected path to make a check pass.
+requirements from other conversations. Do not modify a hard-protected path to make a
+check pass. A scope addition must be explicit in the result and satisfy the bounded
+rule above; otherwise stop and report the blocker.
 
 ## Verification
 
@@ -92,7 +99,9 @@ failed, or unverifiable commands as such and use a failure result.
 - Implement only this task; do not re-plan it or edit plan/checklist files.
 - Do not stage, commit, amend, merge, rebase, reset, push, switch branches, or
   mutate Git history or refs.
-- Do not edit, create, delete, rename, or generate a protected or unexpected path.
+- Do not edit, create, delete, rename, or generate a hard-protected path. Do not
+  change an unlisted path unless it satisfies the bounded scope-addition rule and is
+  reported explicitly.
 - Do not delegate or invoke nested agents or other implementers/reviewers.
 - Do not write transcripts, sessions, credentials, secrets, or persistent memory.
 - Do not overwrite, discard, or normalize pre-existing baseline work.
@@ -112,6 +121,8 @@ Return exactly this Markdown structure, replacing placeholders:
 WORKER_RESULT: success|failure
 Changed paths:
 - <every exact changed path, or none>
+Scope additions requested:
+- none or <path> — <explicit task requirement and why this adjacent change is mechanically necessary>
 Implementation summary:
 - <concise item>
 Verification:
@@ -122,5 +133,5 @@ Blockers/risks:
 
 After a verification failure, attempt a task-scoped fix and rerun it. Use
 `WORKER_RESULT: failure` only if it still fails, cannot be rerun, or needs broader
-scope/new decision. List every changed path; do not claim success when a required
-check was skipped.
+scope/new decision. List every changed path and every requested scope addition; do not
+claim success when a required check was skipped.

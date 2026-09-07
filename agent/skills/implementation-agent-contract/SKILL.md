@@ -25,10 +25,15 @@ conversation, an unavailable plan, or a prior attempt.
 ## Scope and safety
 
 - Inspect before changing. Keep work precise, minimal, and repository-native.
-- Read **allowed paths** and **protected paths** literally. Create, change, delete,
-  rename, or generate nothing outside the allowed set, including plans, checklists,
-  configuration, runtime state, and unrelated user changes. Preserve every protected
-  baseline path byte-for-byte.
+- Read **initially allowed paths** and **hard-protected paths** literally. Preserve
+  every hard-protected and baseline path byte-for-byte. An implementation worker may
+  change an unlisted tracked path only when the packet permits bounded scope additions
+  and the change is a minimal adjacent consequence of an explicit task requirement,
+  needs no new product, architecture, security, dependency, or scope decision, and is
+  reported with its necessity under `Scope additions requested`. This never permits
+  generated artifacts, plans/checklists, opportunistic cleanup, or unrelated changes.
+  Reviewers never add paths; they inspect the coordinator's final allowed list and the
+  reconciliation evidence.
 - Do not delegate, invoke nested agents, or ask another process to implement or
   review the task.
 - Never write transcripts, sessions, credentials, secrets, or persistent memory.
@@ -41,7 +46,7 @@ conversation, an unavailable plan, or a prior attempt.
 
 ## Concise reporting
 
-Report only durable, actionable evidence: outcome, every changed path, requested
-verification commands and results, and blockers or risks. Preserve the packet's
+Report only durable, actionable evidence: outcome, every changed path, every requested
+scope addition and rationale, verification commands and results, and blockers or risks. Preserve the packet's
 exact labels and schema. Do not paste raw logs, transcripts, or speculation. A
 successful report must not imply that an unrun or failed check passed.

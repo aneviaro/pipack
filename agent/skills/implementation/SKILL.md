@@ -22,16 +22,18 @@ For one pending task, run:
   if none, ask for a path. Require `### Task N:`/`### Iteration N:` and use the first
   unchecked section.
 - **Preflight:** read plan/spec/guidance; capture branch, Base SHA, status/index/baseline,
-  existing `pi-agent-*` refs, exact agents, frozen allowed/protected paths, and checks.
-  Require clean index and committed HEAD; refuse `main`/`master`, detached/protected
-  branches, drift, ambiguity, unavailable agents, or baseline conflicts. Stop without
-  mutating baseline.
+  existing `pi-agent-*` refs, exact agents, initial allowed paths, frozen hard-protected
+  paths, and checks. Require clean index and committed HEAD; refuse `main`/`master`,
+  detached/protected branches, drift, ambiguity, unavailable agents, or baseline
+  conflicts. Stop without mutating baseline.
 - **Render packet/worker:** fill the worker packet in memory with context, scope,
-  prohibitions, and checks. Use exact custom types, fresh
-  foreground workers, no polling. Recovery restarts restore only a validated binary
-  delta from the unchanged Base SHA; never resume or merge transport history.
-  Validate success, new ref, ancestry/no merges, scope, report/path agreement, checks,
-  branch, and baseline.
+  prohibitions, and checks. Use exact custom types, fresh foreground workers, no
+  polling. Recovery restarts restore only a validated binary delta from the unchanged
+  Base SHA; never resume or merge transport history. Validate success, new ref,
+  ancestry/no merges, report/path agreement, checks, branch, and baseline. Reconcile a
+  reported, minimal, mechanically required adjacent tracked path under the protocol's
+  bounded scope-reconciliation gate instead of restarting solely because preflight
+  omitted it; reject every unreconcilable scope change.
 - **Review/correct:** fill the review packet and launch a fresh foreground read-only
   `task-reviewer`; only `approve` passes. Material,
   task-scoped, decision-free rejection gets a fresh Base-SHA worker and reviewer.
@@ -39,10 +41,10 @@ For one pending task, run:
   most three fresh correction workers after the initial attempt/review, plus one
   explicitly user-authorized extra after a blocked resume. Provider/turn-limit failure
   uses recovery, never resume. Stop/report when the correction budget is exhausted.
-- **Integrate/verify:** stop on malformed review, scope/baseline/branch drift, or any
-  blocker; retain refs and leave checklists unchecked. Recheck gates, apply only the
-  accepted path-limited tree delta (never transport history), inspect staged scope,
-  content/check, then run every requested main-tree/native check.
+- **Integrate/verify:** stop on malformed review, unreconciled scope, baseline/branch
+  drift, or any blocker; retain refs and leave checklists unchecked. Recheck gates,
+  apply only the accepted final-allowed-path tree delta (never transport history),
+  inspect staged scope, content/check, then run every requested main-tree/native check.
 - **Record/cleanup/learn:** after verification change only current-task checkboxes and
   make one task-only authoritative commit. Atomically compare-delete only this run's
   refs, invoke
@@ -74,13 +76,16 @@ Reduce latency without weakening any safety or verification gate:
 - Before an exact edit, re-read the narrow current file region. After an old-text
   mismatch, do not retry the stale patch. Make expected no-match searches explicit
   rather than treating them as unexplained failures.
+- Do not restart a successful worker solely for an omitted adjacent tracked path when
+  it passes bounded scope reconciliation. Record the path and rationale, add it to the
+  final allowed list, and send that evidence to the reviewer.
 - If the same setup, test, or contract failure repeats twice without a changed input,
   stop at that gate and report it; do not spend another correction cycle on an
   unchanged blocker. Provider, timeout, turn-limit, or output-limit failures instead
   follow the recovery path immediately with a concise packet and a fresh worker from
   the unchanged Base SHA.
 
-Every checklist mutation and commit requires a successful worker, validated in-scope
-Base-SHA ref without merges, fresh approval, accepted-tree integration, and passing
+Every checklist mutation and commit requires a successful worker, validated or
+scope-reconciled Base-SHA ref without merges, fresh approval, accepted-tree integration, and passing
 main-tree verification, including every final fix. Never stage early or persist
 packets, transcripts, sessions, credentials, or runtime state.

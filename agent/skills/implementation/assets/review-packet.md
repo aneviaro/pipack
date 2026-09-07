@@ -12,8 +12,10 @@ inheritance. Do not save the filled packet in the repository.
 - Plan path: `<plan path>`
 - Source-spec path and complete relevant excerpt: `<path>` / `<complete excerpt>`
 - Exact task section: `<complete current task section>`
-- Allowed paths: `<complete frozen list>`
-- Protected paths and baseline: `<complete list and status/index/content identity>`
+- Initially allowed paths: `<complete preflight list>`
+- Scope additions reconciled by coordinator: `<none, or path plus explicit requirement, necessity, and coordinator inspection evidence>`
+- Final allowed paths: `<initial list plus reconciled additions>`
+- Hard-protected paths and baseline: `<complete list and status/index/content identity>`
 - Dependency invariants: `<relevant invariants and prior outputs>`
 - Worker attempt: `<attempt identifier>`
 - Transport ref: `<exact newly created pi-agent-* ref>`
@@ -23,9 +25,9 @@ inheritance. Do not save the filled packet in the repository.
 - Worker verification evidence: `<commands and results>`
 
 The coordinator has validated that the worker reported success, the ref is new, it
-has Base SHA ancestry and no merges, its delta is in scope, and the main branch,
-index, and baseline have not drifted. Treat those as evidence to recheck, not as a
-substitute for inspection.
+has Base SHA ancestry and no merges, every changed path is initially allowed or passed
+bounded scope reconciliation, and the main branch, index, and baseline have not
+shifted. Treat those as evidence to recheck, not as a substitute for inspection.
 
 ## Read-only inspection
 
@@ -56,8 +58,10 @@ Check and record concise evidence for each criterion:
 2. **Protocol correctness:** packet semantics, lifecycle gates, correction/recovery,
    blocker/resume behavior, and required exact labels or schemas are unambiguous and
    internally consistent.
-3. **Scope:** changed paths equal the allowed list (or an explicitly permitted
-   subset); no protected, generated, unrelated, plan, or checklist path changed.
+3. **Scope:** changed paths are a subset of the final allowed list; each reconciled
+   addition is a minimal adjacent consequence of an explicit task requirement and
+   requires no new decision; no hard-protected, generated, unrelated, plan, checklist,
+   or baseline path changed.
 4. **Correctness and regressions:** content is precise, simple, repository-native, and
    does not weaken an existing safety gate.
 5. **Security/privacy:** no credentials, secrets, transcripts, sessions, persistent

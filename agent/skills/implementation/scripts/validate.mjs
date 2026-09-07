@@ -108,13 +108,13 @@ for (const role of ['worker', 'reviewer']) {
 }
 const normalized = Object.fromEntries(Object.entries(text).map(([key, value]) => [key, value.replace(/\s+/g, ' ')]));
 const markers = {
-  skill: ['select', 'preflight', 'render packet', 'worker', 'validate ref', 'review/correct', 'integrate', 'verify', 'record', 'cleanup', 'learn', 'final whole-plan review', 'at most three fresh', 'one explicitly user-', 'fresh isolated worker for the affected task', 'full worker-result/ref', 'accepted-tree integration', 'separate authoritative fix commit', 'accepted path-limited tree delta', 'Atomically compare-delete', 'one task-only authoritative commit', 'Complete learning before success', 'Stop/report when'],
-  protocol: ['## Canonical vocabulary', '## Invariants and ownership', '## Lifecycle and durable-mutation gates', '## Correction and recovery rules', '## Blocked / resume decision matrix'],
+  skill: ['select', 'preflight', 'render packet', 'worker', 'validate ref', 'review/correct', 'integrate', 'verify', 'record', 'cleanup', 'learn', 'final whole-plan review', 'at most three fresh', 'one explicitly user-', 'fresh isolated worker for the affected task', 'full worker-result/ref', 'accepted-tree integration', 'separate authoritative fix commit', 'accepted final-allowed-path tree delta', 'Atomically compare-delete', 'one task-only authoritative commit', 'Complete learning before success', 'Stop/report when'],
+  protocol: ['## Canonical vocabulary', '## Invariants and ownership', '## Lifecycle and durable-mutation gates', '## Bounded scope reconciliation', '## Correction and recovery rules', '## Blocked / resume decision matrix'],
   shared: ['## Instruction and packet precedence', '## Scope and safety', '## Concise reporting'],
-  task: ['## Identity and execution', '## Task contract', '## Scope', '### Allowed paths', '### Protected paths', '## Verification', '## Prohibitions', '## Worker result (exact schema)', 'WORKER_RESULT: success|failure', 'Changed paths:', 'Implementation summary:', 'Blockers/risks:'],
-  review: ['## Identity and ref evidence', 'Allowed paths:', 'Protected paths and baseline:', '## Read-only inspection', '## Review coverage and criteria', '## Reviewer result (exact schema)', 'REVIEW_RESULT: approve|request changes', 'Findings:', 'Task/plan coverage:', 'Verification evidence:', 'Recommendation: approve'],
-  checkpoint: ['plan:', 'task_base_sha:', 'worker:', 'outcome:', 'retained_transport_refs:', 'review:', 'stopped_gate:', 'NEXT_SAFE_ACTION:'],
-  worker: ['WORKER_RESULT: success|failure'],
+  task: ['## Identity and execution', '## Task contract', '## Scope', '### Initially allowed paths', '### Hard-protected paths', '## Verification', '## Prohibitions', '## Worker result (exact schema)', 'WORKER_RESULT: success|failure', 'Changed paths:', 'Scope additions requested:', 'Implementation summary:', 'Blockers/risks:'],
+  review: ['## Identity and ref evidence', 'Initially allowed paths:', 'Scope additions reconciled by coordinator:', 'Final allowed paths:', 'Hard-protected paths and baseline:', '## Read-only inspection', '## Review coverage and criteria', '## Reviewer result (exact schema)', 'REVIEW_RESULT: approve|request changes', 'Findings:', 'Task/plan coverage:', 'Verification evidence:', 'Recommendation: approve'],
+  checkpoint: ['plan:', 'task_base_sha:', 'worker:', 'outcome:', 'scope_reconciliation:', 'retained_transport_refs:', 'review:', 'stopped_gate:', 'NEXT_SAFE_ACTION:'],
+  worker: ['WORKER_RESULT: success|failure', 'Scope additions requested'],
   reviewer: ['REVIEW_RESULT: approve|request changes', 'Recommendation: approve|request changes'],
 };
 for (const [file, required] of Object.entries(markers)) {
@@ -161,7 +161,7 @@ const active = ['skill', 'protocol', 'shared', 'task', 'review', 'checkpoint', '
 const metrics = active.map((key) => ({ key, path: relative(root, files[key]), chars: text[key].length, lines: text[key].split('\n').length }));
 if (metrics.find((entry) => entry.key === 'skill').lines > 250) fail('SKILL.md exceeds 250 lines');
 const total = metrics.reduce((sum, entry) => sum + entry.chars, 0);
-if (total > 28000) fail(`active instruction surface exceeds 28000 characters: ${total}`);
+if (total > 36000) fail(`active instruction surface exceeds 36000 characters: ${total}`);
 
 for (const entry of metrics) console.log(`${entry.path}: ${entry.chars} chars, ${entry.lines} lines`);
 console.log(`active instruction surface: ${total} chars`);
