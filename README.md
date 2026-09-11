@@ -43,10 +43,13 @@ updates, commits, and cleanup. The worker's model, tools, and isolation stay fix
 the coordinator chooses `medium`, `high`, or `xhigh` reasoning per attempt (`high` by
 default). Runtime task directories, reports, and transcripts are created in a temporary
 directory outside the reviewed repository and removed after the workflow finishes.
+Task workers build a clean cumulative candidate first; revmux runs only once all plan
+tasks are implemented, with up to four final whole-plan review cycles. The fourth cycle
+asks only for blocking changes.
 
-For each plan item, the high-level lifecycle is:
+For a plan, the high-level lifecycle is:
 
-`task packet → isolated implementation-worker → temporary revmux review → coordinator verification → checklist update → feature-branch commit`
+`all task packets → isolated implementation-workers → cumulative candidate verification → final whole-plan revmux (cycles 1-4) → coordinator integration → checklist update → one feature-branch commit`
 
 The [implementation skill](agent/skills/implementation/SKILL.md) and its
 [protocol](agent/skills/implementation/references/protocol.md) are canonical; the

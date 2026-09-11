@@ -10,8 +10,8 @@ repository.
 - Repository root: `<absolute repository root>`
 - Working directory: `<absolute worker worktree>`
 - Active feature branch: `<branch>`
-- Base SHA: `<committed HEAD immediately before this task>`
-- Isolation: `worktree`; starting point: committed `HEAD` at Base SHA
+- Candidate Base SHA: `<committed cumulative candidate HEAD immediately before this task>`
+- Isolation: `worktree`; starting point: committed candidate `HEAD` at Candidate Base SHA
 - Plan path: `<plan path>`
 - Source-spec path: `<source-spec path>`
 - Attempt: `<initial | correction N | recovery restart N>`
@@ -79,10 +79,10 @@ Hard-protected baseline status/content: `<identity to recheck before reporting>`
 Inspect before editing. Keep implementation minimal and generic. Do not infer missing
 requirements from other conversations. Do not modify a hard-protected path to make a
 check pass. A scope addition must be explicit in the result and satisfy the bounded
-rule above; otherwise stop and report the blocker. For a correction, address each
-revmux finding. If no change is warranted, explain the concrete rebuttal under
-`Review response`; the coordinator may pass it to a fresh revmux round but may not
-silently dismiss the finding.
+rule above; otherwise stop and report the blocker. For a final-review correction, address
+each blocking revmux finding. If no change is warranted, explain the concrete rebuttal
+under `Review response`; the coordinator may pass it to the next final-review cycle but
+may not silently dismiss a finding. Revmux never runs for an individual task.
 
 ## Verification
 
@@ -116,7 +116,7 @@ failed, or unverifiable commands as such and use a failure result.
 
 For a recovery restart only, the packet may name one validated `pi-agent-*` recovery
 ref and permit restoring its path-limited binary delta with `git diff --binary
-<Base SHA>...<recovery-ref> | git apply`. Never cherry-pick or merge that ref.
+<Candidate Base SHA>...<recovery-ref> | git apply`. Never cherry-pick or merge that ref.
 
 ## Worker result (exact schema)
 

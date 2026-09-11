@@ -31,6 +31,8 @@ const read = (file) => {
   }
 };
 const text = Object.fromEntries(Object.entries(files).map(([key, file]) => [key, read(file)]));
+const profileScriptPath = resolve(implementation, 'scripts/materialize-revmux-profile.mjs');
+const profileScript = read(profileScriptPath);
 const staleReviewer = resolve(root, 'agent/agents/task-reviewer.md');
 if (existsSync(staleReviewer)) fail('obsolete custom task-reviewer definition must be removed');
 for (const [key, value] of Object.entries(text)) {
@@ -100,20 +102,23 @@ if (actual.skills === 'false') fail(`${workerPath} must not disable skills`);
 const normalized = Object.fromEntries(Object.entries(text).map(([key, value]) => [key, value.replace(/\s+/g, ' ').toLowerCase()]));
 const markers = {
   skill: [
-    'select', 'preflight', 'render packet', 'worker', 'validate ref', 'revmux review/correct',
-    'integrate', 'verify', 'record', 'cleanup', 'learn', 'temporary tasks directory outside',
-    'final whole-plan revmux review', 'accepted-tree integration', 'one authoritative task commit',
-    'worker and review sequential', 'three consecutive no-change cycles', 'Review response',
-    'worker reasoning', 'medium', 'high', 'xhigh',
-    'Stop/report when',
+    'select plan', 'preflight', 'render packet', 'worker', 'validate ref', 'integrate candidate',
+    'verify task', 'repeat tasks', 'final whole-plan revmux review/correct', 'record', 'cleanup',
+    'learn', 'temporary tasks directory outside', 'at most four total review cycles',
+    'cycle 4', 'blocking changes only', 'never run revmux between tasks',
+    'one authoritative whole-plan commit', 'cumulative candidate', 'three consecutive no-change cycles',
+    'Review response', 'worker reasoning', 'review profile', 'implementation-codex',
+    'gpt-5.6-sol:low', 'gpt-5.6-luna:xhigh', 'medium', 'high', 'xhigh',
+    'Stop/report at cycle 4',
   ],
   protocol: [
     '## Canonical vocabulary', '## Invariants and ownership',
     '## Lifecycle and durable-mutation gates', '## Bounded scope reconciliation',
-    '## Revmux review contract', '## Correction and recovery rules',
+    '## Final whole-plan revmux review contract', '## Correction and recovery rules',
     '## Blocked / resume decision matrix', 'sources.expected', 'sources.reported',
-    'no_change_cycles', 'byte-identical', 'Three consecutive no-change correction cycles',
-    'worker reasoning',
+    'no_change_cycles', 'byte-identical', 'Cycle 4 is always the last cycle',
+    'worker reasoning', 'review profile', 'revmux config', 'implementation-codex',
+    'gpt-5.6-sol:low', 'gpt-5.6-luna:xhigh', 'candidate Base SHA', 'candidate ref',
   ],
   shared: ['## Instruction and packet precedence', '## Scope and safety', '## Concise reporting'],
   task: [
@@ -124,17 +129,21 @@ const markers = {
   ],
   review: [
     '## Identity and ref evidence', 'revmux new', '--tasks-dir', 'scope.md', 'goal.md', 'Worker reasoning:',
-    '## Required round input', '## Invocation', '--workdir', '--profile comprehensive',
+    'Review profile:', 'Resolved review executors:', 'revmux config --profile',
+    'implementation-codex', 'materialize-revmux-profile.mjs', 'every selected task has',
+    '## Required round input', '## Invocation', '--workdir', '--profile "<review-profile>"',
     '## Required JSON validation and decision mapping', 'sources.expected === sources.reported',
     'sources.degraded', 'findings', 'open_questions', 'pre_existing', 'immaterial',
-    'confirmed', 'refined', 'unverified', 'Review response', 'no-change',
-    'Exit `0`', 'Exit `1`', 'Exit `2`',
+    'confirmed', 'refined', 'unverified', 'Review response', 'no-change', 'cycle 4',
+    'blocking changes only', 'Exit `0`', 'Exit `1`', 'Exit `2`',
     '## Correction rounds', '## Read-only prohibitions',
   ],
   checkpoint: [
-    'plan:', 'task_base_sha:', 'worker_reasoning:', 'worker:', 'outcome:', 'revmux_task:', 'revmux_round:',
-    'revmux_tasks_dir:', 'no_change_cycles:', 'scope_reconciliation:', 'retained_transport_refs:',
-    'review:', 'review_responses:',
+    'plan:', 'plan_base_sha:', 'task_base_sha:', 'candidate_ref:', 'candidate_sha:',
+    'worker_reasoning:', 'revmux_profile:', 'revmux_executors:', 'worker:', 'outcome:',
+    'tasks_total:', 'tasks_completed:', 'revmux_scope:', 'revmux_cycle:', 'revmux_task:',
+    'revmux_round:', 'revmux_tasks_dir:', 'no_change_cycles:', 'scope_reconciliation:',
+    'retained_transport_refs:', 'retained_candidate_refs:', 'review:', 'review_responses:',
     'stopped_gate:', 'NEXT_SAFE_ACTION:',
   ],
   worker: ['WORKER_RESULT: success|failure', 'Scope additions requested', 'Review response'],
@@ -142,14 +151,34 @@ const markers = {
 for (const [file, required] of Object.entries(markers)) {
   for (const marker of required) if (!normalized[file].includes(marker.toLowerCase())) fail(`${file} missing required marker: ${marker}`);
 }
+for (const marker of [
+  'codex/gpt-5.6-sol:low', 'codex/gpt-5.6-luna:xhigh',
+  'lenses: [bugs, impl, architecture, quality, docs, tests, comments, adversarial]',
+  "['config', '--profile', 'implementation-codex']", "['login', 'status']",
+]) if (!profileScript.includes(marker)) fail(`profile materializer missing required marker: ${marker}`);
 if (!normalized.skill.includes('every checklist mutation and commit requires')) fail('SKILL.md omits durable mutation gate');
 for (const marker of [
-  'Stop without mutating baseline', 'stop on malformed review', 'leave checklists unchecked',
-  'Stop/report when the correction budget is exhausted', 'Revmux-requested corrections',
-  'at most three fresh correction workers', 'one explicitly user-authorized extra',
-  'fresh worker from its task base', 'full ref validation', 'fresh revmux round',
-  'three consecutive no-change cycles', 'accepted-tree integration', 'main-tree verification', 'separate authoritative fix commit',
+  'Stop without mutating the baseline', 'stop on malformed review', 'leave all checklists unchecked',
+  'Stop/report at cycle 4', 'final-review correction', 'fresh worker', 'latest cumulative candidate',
+  'full ref validation', 'new review cycle', 'three consecutive no-change cycles (byte-identical',
+  'accepted-candidate integration', 'main-tree verification', 'single authoritative whole-plan commit',
+  'never run revmux between tasks', 'blocking changes only',
 ]) if (!normalized.skill.includes(marker.toLowerCase())) fail(`SKILL.md omits required safety/correction marker: ${marker}`);
+
+const obsoleteWorkflowPatterns = [
+  ['per-task state machine', /for one pending task[\s\S]*revmux/],
+  ['per-task review summary', /for each (?:plan item|task)[^.\n]{0,180}revmux/],
+  ['temporary per-task review', /temporary revmux review\s*→/],
+  ['old correction budget', /at most three fresh correction workers/],
+  ['fifth review cycle', /(?:user-authorized|extra) fifth cycle|one explicitly user-authorized extra cycle/],
+  ['task-only authoritative commit', /one authoritative task-only commit/],
+  ['old review-to-integration transition', /revmux review\/correct\s*→\s*integrate/],
+];
+for (const [file, value] of Object.entries(normalized)) {
+  for (const [name, pattern] of obsoleteWorkflowPatterns) {
+    if (pattern.test(value)) fail(`${file} retains obsolete workflow marker: ${name}`);
+  }
+}
 
 const metrics = Object.entries(files).map(([key, file]) => ({
   key, path: relative(root, file), chars: text[key].length, lines: text[key].split('\n').length,

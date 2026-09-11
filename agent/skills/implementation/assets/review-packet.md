@@ -1,122 +1,128 @@
-# Revmux review packet
+# Final whole-plan revmux review packet
 
-This fillable packet is the coordinator's self-contained contract for one external
-revmux review. Do not save it or any report in the repository. Revmux agents receive
-only the generated round inputs and inspect the supplied repository read-only.
+Contract for the only read-only revmux phase. Keep inputs and reports outside the
+repository. Revmux reviews the complete cumulative candidate only after every task is
+implemented and verified; it never reviews an individual task.
 
 ## Identity and ref evidence
 
 - Repository root / `--workdir`: `<absolute repository root>`
 - Active feature branch: `<branch>`
-- Base SHA: `<task Base SHA>`
-- Plan/spec/task: `<paths and complete relevant excerpts>`
-- Worker attempt: `<initial | correction N | recovery restart N>`
+- Plan Base SHA: `<committed HEAD before the first plan task>`
+- Candidate Base SHA: `<committed cumulative candidate SHA before this round>`
+- Plan/spec/task set: `<paths and complete relevant excerpts>`
+- Review cycle: `<1 | 2 | 3 | 4>` (`1` initial; `2-4` corrections)
+- Worker attempt: `<all tasks complete | final correction N>`
 - Worker reasoning: `<medium | high | xhigh>` (coordinator-selected)
+- Review profile: `<implementation-codex | explicit user override>`
+- Resolved review executors: `<exact unique executor names from revmux config>`
 - Consecutive no-change correction cycles: `<number before this round>`
-- Transport ref and recorded SHA: `<pi-agent-* / SHA>`
-- Changed paths: `<exact git diff --name-only Base...Transport output>`
-- Initially allowed paths: `<complete list>`
+- Candidate ref and recorded SHA: `<coordinator candidate ref / SHA>`
+- Changed paths: `<exact git diff --name-only PlanBase...Candidate output>`
+- Initially allowed paths: `<union of every task's initial list>`
 - Scope additions: `<none, or rationale plus coordinator inspection evidence>`
-- Final allowed paths: `<complete list>`
-- Hard-protected paths and baseline identity: `<complete list and status/index/content identity>`
-- Worker report and verification: `<complete concise report>`
+- Final allowed paths: `<complete union of allowed paths>`
+- Hard-protected paths/baseline: `<paths and status/index/content identity>`
+- Task worker reports and verification: `<concise ledger for every task>`
 - Revmux temporary tasks directory: `<absolute path outside repository>`
 - Revmux task id / round: `<safe id> / <NN-label>`
 
 ## Preflight and round creation
 
-Verify `revmux`, every configured child CLI, the branch, Base SHA, clean index,
-baseline, and transport-ref gates before creating the round. Use a temporary tasks
-directory outside the repository. Run `revmux new` and use only the absolute paths in
-its JSON response; never construct paths or create `.revmux/` in the repository:
+Do not create a review task until every selected task has a successful worker result,
+validated candidate integration, and passing task verification. Default to
+`implementation-codex`: materialize it outside the repository with
+`scripts/materialize-revmux-profile.mjs <review-root>`, then run `revmux config --profile
+implementation-codex` from that root. Require the resolved one-agent Sol-low finder and
+Luna-xhigh synthesis/verify topology plus Codex availability. Use another profile only on
+explicit user request; record and never silently substitute it. Use only absolute paths
+returned by `revmux new`; never create repository `.revmux/`:
 
 ```sh
 review_root=$(mktemp -d)
-revmux new --tasks-dir "$review_root/tasks" --task "<task-id>" --run "<NN-label>"
+revmux new --tasks-dir "$review_root/tasks" --task "<whole-plan-task-id>" --run "<NN-label>"
 ```
 
-Write non-empty `scope.md` and `goal.md` at the returned paths. Do not write `profile.md`
-unless an explicitly chosen review bar requires it. The task file may be filled only when
-`revmux new` created the blank task template, using the plan/task description and no
-repository-specific runtime state.
+Write non-empty `scope.md` and `goal.md` at the returned paths. Write `profile.md` only
+for an explicit review-bar override. Fill a blank task template only with the whole-plan
+description, never repository runtime state.
 
 ## Required round input
 
-`scope.md` must contain bullets and plain command blocks with:
+`scope.md` must contain bullets and plain command blocks with the exact whole-plan subject
+and scale; these commands; every changed path and why it matters; the union of task
+allowed paths, additions, protected paths, and baseline identity; and this instruction:
+inspect only, never edit/write/stage/commit/mutate refs, and do not treat worker or
+coordinator claims as approval. It must state that no task-level revmux review occurred
+or is required.
 
-- exact review subject and scale;
-- `git diff <Base SHA>...<Transport ref>` and `git diff --check <Base SHA>...<Transport ref>`;
-- every changed path to read in full and the reason it matters;
-- final allowed/protected paths and baseline preservation;
-- explicit instruction: inspect only, never edit/write/stage/commit/mutate refs, and do
-  not treat worker or coordinator claims as approval.
+```sh
+git diff <Plan Base SHA>...<Candidate ref>
+git diff --check <Plan Base SHA>...<Candidate ref>
+```
 
-`goal.md` must contain the task goal, complete observable completion criteria, and this
-bar: report only material defects, missing required behavior, unsafe prompt/schema/script
-changes, or contradictions that would make a later implementation run wrong. A clean
-review is valid.
+`goal.md` must contain the complete goal, observable criteria, current cycle, and bar.
+Cycles 1-3 ask for material defects. Cycle 4 asks for **blocking changes only**:
+correctness, security, data loss, build/test, or release blockers. Non-blocking cycle-4
+observations are immaterial and must not trigger another correction.
 
 ## Invocation
 
-Run from a temporary working directory or otherwise ensure project `.revmux/` is not
-used unintentionally. The reviewed repository is supplied as `--workdir`; the archive
-stays outside it. Keep stdout and stderr separate:
+Run from a temporary directory or otherwise ensure project `.revmux/` is not used. The
+reviewed repository is supplied as `--workdir`; the archive stays outside it. Separate
+stdout/stderr:
 
 ```sh
 revmux --tasks-dir "<review_root>/tasks" \
   --workdir "<repository root>" \
-  --task "<task-id>" --run "<NN-label>" \
-  --profile comprehensive --no-tui \
+  --task "<whole-plan-task-id>" --run "<NN-label>" \
+  --profile "<review-profile>" --no-tui \
   > "<review_root>/report.json" 2> "<review_root>/progress.log"
 ```
 
-Exit `0` means a completed report with no findings; exit `1` means a completed report
-with findings. Neither is a process failure. Exit `2`, a missing report, invalid JSON,
-or a command/CLI error is a blocked review. Never merge stderr into JSON and never retry
-exit `1`.
+Exit `0` is a completed clean report; exit `1` is completed with findings. Exit `2`,
+missing/invalid JSON, or a CLI error blocks review; never retry exit `1` as tool failure.
 
 ## Required JSON validation and decision mapping
 
-Read the report as JSON and require this shape:
+Read the report as JSON and require:
 
-- `scope.task` and `scope.run` match the invocation;
-- `sources.expected === sources.reported` and `sources.degraded` is an empty array;
+- `scope.task`/`run` match invocation and the archive manifest resolves the recorded
+  profile/executors;
+- `sources.expected === sources.reported` and `sources.degraded` is empty;
 - `findings`, `open_questions`, `pre_existing`, and `immaterial` are arrays;
 - every finding has `file`, `line`, `severity`, `confidence`, `title`, `body`, `fix`, and
-  `verdict`; `verdict` is `confirmed`, `refined`, or `unverified`;
-- `stats` exists and the post-review repository status, index, Base SHA, and protected
-  baseline still match the preflight identity.
+  `verdict`, where `verdict` is `confirmed`, `refined`, or `unverified`;
+- `stats` exists and post-review status, index, Plan Base SHA, and protected baseline
+  match preflight.
 
-Normalize the result for the coordinator:
+On cycles 1-3, confirmed/refined material findings block approval. On cycle 4, only
+confirmed/refined **blocking** findings request correction; record non-blocking findings
+as immaterial. Any unverified finding, degraded source, invalid field, or unresolved
+`open_questions` blocks approval, including cycle 4. `pre_existing` and `immaterial`
+findings are recorded separately. A correction worker's `Review response` is evidence,
+not permission to dismiss a finding; pass it to the next goal. Approval requires no
+blocking item and a cycle from 1-4. Never run a fifth cycle.
 
-- `confirmed` or `refined` findings are material correction candidates and prevent approval;
-- any `unverified` finding, degraded source, invalid field, or unresolved `open_questions`
-  blocks approval rather than being guessed through;
-- a correction worker's `Review response` is evidence for revmux, not permission to dismiss
-  its finding; include each response in the next round's goal and let the fresh review decide;
-- `pre_existing` and `immaterial` findings are recorded separately and do not require a
-  correction;
-- approval is the coordinator decision `Reviewed` only when no blocking item remains.
-
-Preserve the complete report path and concise counts in the checkpoint, but never paste
-raw prompts, logs, transcripts, or credentials into repository files.
+Checkpoint the report path, cycle, and counts; never persist prompts, logs, transcripts,
+or credentials in repository files.
 
 ## Correction rounds
 
-For a correction, keep the same temporary revmux task directory and use a fresh round such
-as `02-correction-01`; write a new scope describing the corrected transport ref. Revmux
-will carry prior round summaries into the new round. Do not paste prior findings into the
-new scope. Include the worker's concise `Review response` in the new goal when a finding
-was not changed. The worker still starts from the unchanged Base SHA. Compare the new
-transport tree with the preceding reviewed candidate: reset `no_change_cycles` on a real
-change and increment it when byte-identical. Stop after three consecutive no-change cycles,
-even if the ordinary correction budget remains. The ordinary budget is three fresh workers
-plus one explicitly user-authorized extra cycle after a blocked resume. A rejected or
-blocked review ref is never integrated.
+Keep the same temporary tasks directory and profile. Cycle 1 is the initial review; cycles
+2-4 use a fresh round such as `02-correction-01`, a fresh worker, and the latest validated
+cumulative candidate SHA as Base SHA. Do not paste prior findings into `scope.md`; put
+unchanged-finding `Review response` evidence in `goal.md`. The new candidate must retain
+the complete Plan Base-to-candidate delta and pass worker/ref/scope gates.
+
+Compare it with the preceding reviewed candidate: reset `no_change_cycles` on a real
+change and increment it when byte-identical. Stop after three consecutive no-change
+cycles or at cycle 4, whichever comes first. Cycle 4 requests only blocking changes. A
+rejected/blocked candidate is never integrated; there is no cycle 5.
 
 ## Read-only prohibitions
 
-The revmux invocation and its review subprocesses may inspect the repository and transport
-ref only. They must not modify source, plans, checklists, Git refs, index, worktrees,
-credentials, sessions, or runtime state. After every run, recheck the main-tree baseline;
-if it changed, stop before integration and retain the ref and temporary archive.
+Revmux and its subprocesses may inspect only the repository and cumulative candidate ref.
+They must not modify source, plans, checklists, Git refs, index, worktrees, credentials,
+sessions, or runtime state. After every run, recheck the main baseline; if it changed,
+stop before candidate replacement/final integration and retain the candidate/archive.
