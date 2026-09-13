@@ -110,9 +110,10 @@ or credentials in repository files.
 ## Correction rounds
 
 Keep the same temporary tasks directory and profile. Cycle 1 is the initial review; cycles
-2-4 use a fresh round such as `02-correction-01`, a fresh worker, and the latest validated
-cumulative candidate SHA as Base SHA. Do not paste prior findings into `scope.md`; put
-unchanged-finding `Review response` evidence in `goal.md`. The new candidate must retain
+2-4 use a fresh round such as `02-correction-01` and the latest validated cumulative
+candidate SHA as Base SHA. Resume matching correction state; use a new worker only when
+reuse is unsafe. Do not paste prior findings into `scope.md`; put unchanged-finding
+`Review response` evidence in `goal.md`. The new candidate must retain
 the complete Plan Base-to-candidate delta and pass worker/ref/scope gates.
 
 Compare it with the preceding reviewed candidate: reset `no_change_cycles` on a real

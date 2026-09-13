@@ -21,12 +21,12 @@ hold reusable fields.
 
 ## Invariants and ownership
 
-- Tasks are implemented sequentially. Each worker starts from the current committed
-  candidate Base SHA. Never run revmux between tasks or before every selected task has
-  passed worker and task verification.
-- The coordinator owns checklist state, main index, active branch, candidate refs,
-  integration, authoritative commits, and cleanup. Plan Base SHA, active branch, baseline,
-  and main index stay unchanged while the candidate is built.
+- Tasks are implemented sequentially from the current committed candidate Base SHA.
+  Resume an interrupted worker's persisted session/worktree or validated candidate-relative
+  delta when base, baseline, and scope match. Never run revmux between tasks or before
+  every selected task has passed worker and task verification.
+- The coordinator owns checklist, index, branch, candidate refs, integration, commits, and
+  cleanup. Plan Base SHA, branch, baseline, and index stay unchanged while building.
 - Candidate staging refs/commits are temporary coordinator state: clean and committed for
   the next worker's Base SHA, but not checklist changes, task commits, or approval.
 - Keep the fixed worker model/tools/isolation. Choose and record one allowed reasoning
@@ -53,7 +53,7 @@ A successful plan follows:
 | State | Required gates | Durable mutation permitted |
 | --- | --- | --- |
 | **Ready** | Select plan; enumerate unchecked tasks; read guidance; capture branch, plan Base SHA, baseline, index, scopes, checks, reasoning, and profile. | None |
-| **Tasks delegated** | Worker/tools available; launch fresh workers sequentially from committed candidate Base SHA. | None |
+| **Tasks delegated** | Worker/tools available; launch tasks sequentially from committed candidate Base SHA and resume persisted worker/ref after interruption when valid. | None |
 | **Candidate built** | Each worker succeeds; transport ref passes ref/report/path/check/baseline/scope gates; integrate its delta into clean candidate. | Temporary candidate ref/staging commit only. |
 | **Tasks verified** | Every selected task passes in the cumulative candidate. | None; do not create a revmux task or round earlier. |
 | **Final review requested** | Create external archive; write whole-plan scope/goal from plan Base SHA to exact candidate ref; record cycle/profile; invoke revmux. | None |
@@ -66,56 +66,53 @@ A successful plan follows:
 | **Learned** | Concise evidence ledger and cleanup outcome. | Only user-confirmed learning changes. |
 
 If a task worker or verification fails, stop before final review, retain candidate and
-transport refs, and leave all checklists unchecked. Recovery uses unchanged candidate Base
-SHA and a validated binary delta; it consumes no review cycle.
+transport refs, and leave all checklists unchecked. Resume first from persisted state or a
+validated candidate-relative delta at the unchanged candidate Base SHA. Fresh recovery is
+only a fallback when retained state is unavailable or invalid; it consumes no review cycle.
 
 ## Bounded scope reconciliation
 
-Before candidate integration or final review, add a path only if the worker reports it
-under both `Changed paths` and `Scope additions requested` with an explicit requirement;
-it is tracked, baseline-clean, and not protected/generated/plan/checklist/credential/
-runtime/Git/dependency/lockfile/unrelated configuration; the diff is minimal and
-mechanically required with no new decision; and all ref, report, diff-check, verification,
-branch, index, and baseline gates pass. Record initial list, rationale, inspection evidence,
-and final list in the checkpoint and final-review packet. Broad expansion or a missing
+Before integration or final review, add a path only when the worker reports it under both
+`Changed paths` and `Scope additions requested` with an explicit requirement; it is tracked,
+baseline-clean, minimal, mechanically required, and not protected/generated/plan/checklist/
+credential/runtime/Git/dependency/lockfile/unrelated configuration. All ref, report,
+diff-check, verification, branch, index, and baseline gates must pass. Record the lists,
+rationale, and evidence in checkpoint and review packets; broad expansion or a missing
 worker report path is a scope violation.
 
 ## Final whole-plan revmux review contract
 
-For the only revmux phase, use exact absolute paths from `revmux new` in a temporary tasks
-directory outside the repository; never create `.revmux/` in the repository. From the skill
-directory run `scripts/materialize-revmux-profile.mjs <review-root>`, resolve `revmux
-config --profile implementation-codex`, and verify executors. Write non-empty `scope.md`
-and `goal.md` with plan-Base-to-candidate commands, whole-plan scale, every path/reason,
-allowed/protected paths, and read-only rules. Invoke with `--workdir`, external
-`--tasks-dir`, `--task`, `--run`, `--profile <review-profile>`, and `--no-tui`, separating
-stdout/stderr.
+For revmux, use `revmux new` paths in an external temporary directory; never create
+`.revmux/`. Materialize the profile, resolve `revmux config` with `implementation-codex`,
+verify executors, and write non-empty `scope.md`/`goal.md` with plan-Base-to-candidate
+commands, scale, paths/reasons, and read-only rules. Invoke with `--workdir`, `--tasks-dir`,
+`--task`, `--run`, `--profile`, and `--no-tui`.
 
-Validate `scope.task`/`run`, profile/executor manifest, `sources.expected ===
-sources.reported`, empty `sources.degraded`, arrays for `findings`, `open_questions`,
-`pre_existing`, and `immaterial`, required finding fields, and `stats`. Cycles 1-3 request
-material defects. Cycle 4 is always the last cycle and its goal requests only blocking
-changes: correctness, security, data loss, build/test, or release blockers. Record
-non-blocking cycle-4 observations as immaterial. Any unverified finding, degraded source,
-invalid field, or open question blocks approval. Recheck the main baseline after every run.
+Validate task/run, profile/executors, `sources.expected === sources.reported`, empty
+`sources.degraded`, arrays for `findings`, `open_questions`, `pre_existing`, and
+`immaterial`, required finding fields, and `stats`. Cycles 1-3 request material defects;
+Cycle 4 is always the last cycle and requests blocking changes only: correctness, security,
+data loss, build/test, or release blockers. Record non-blocking observations as immaterial;
+unverified findings, degraded sources, invalid fields, or open questions block approval.
+Recheck baseline each run.
 
 ## Correction and recovery rules
 
-There are at most **four total review cycles**: cycle 1 initial, cycles 2-4 fresh
-correction-worker/review rounds, and no cycle 5. A final-review correction starts from
-the latest validated cumulative candidate SHA, not an earlier task Base SHA. Its fresh
-worker fixes each blocking finding or supplies a concrete `Review response`; pass responses
-into the next goal but never dismiss findings on the worker's say-so. Keep archive/profile,
-and replace the candidate only after worker/ref/scope gates pass. Stop/report at cycle 4
-if a blocker remains.
+There are at most **four total review cycles**: cycle 1 initial, cycles 2-4 correction-
+worker/review rounds, and no cycle 5. Corrections start from the latest validated cumulative
+candidate SHA, not an earlier task Base SHA. Resume a matching worker/ref; use a new one only
+when reuse is unsafe. The worker fixes each blocking finding or supplies a concrete `Review
+response`; pass responses into the next goal. Keep archive/profile, replace the candidate
+only after worker/ref/scope gates pass, and stop/report at cycle 4 if a blocker remains.
 
 Track `no_change_cycles` for byte-identical correction candidates; reset on a validated
 change. Stop/report after three consecutive no-change cycles even before cycle 4. Provider,
-turn-limit, or incomplete workers use fresh recovery, never native resume. A safe recovery
-may restore only:
+turn-limit, or incomplete workers resume persisted state or a validated candidate-relative
+ref; fresh recovery is only for missing, incompatible, corrupt, or invalid retained state.
+A reconstructed worktree may restore only:
 
 ```sh
-git diff --binary <candidate-base>...<recovery-ref> | git apply
+git diff --binary <candidate-base> <recovery-ref> | git apply
 git commit  # temporary candidate staging commit, never authoritative
 ```
 
@@ -126,10 +123,10 @@ Do not cherry-pick, merge, rebase, or use transport history.
 | Blocker | Required action | One safe resume action |
 | --- | --- | --- |
 | Missing/malformed worker or CLI | Do not fall back; retain state. | Restore dependency; revalidate preflight. |
-| Provider/turn-limit/incomplete worker | Do not review/integrate. | Fresh recovery from unchanged candidate Base SHA. |
-| Revmux exit 2, invalid/degraded report, or baseline drift | Do not integrate. | Fix input/environment or fresh final round from validated candidate. |
-| Confirmed/refined finding or open question | Do not integrate. | Fresh correction from latest cumulative candidate in next cycle. |
-| Unreconcilable scope | Reject before integration. | Resolve scope; restart from relevant candidate Base SHA. |
+| Provider/turn-limit/incomplete worker | Do not review/integrate until complete. | Resume persisted state or validated ref; fresh recovery only if reuse is unsafe. |
+| Revmux exit 2, invalid/degraded report, or baseline drift | Do not integrate. | Fix input/environment and rerun from the validated candidate; preserve archive inputs. |
+| Confirmed/refined finding or open question | Do not integrate. | Resume compatible correction state, otherwise start one, then run the next cycle. |
+| Unreconcilable scope | Reject before integration. | Resolve scope; reuse unaffected work and reconstruct from the relevant candidate Base SHA. |
 | Four-cycle limit with blocker | Leave checklists unchecked; retain refs/findings. | User decision or new implementation run; never cycle 5. |
 | Three consecutive no-change cycles | Stop automatic correction; retain refs/reports/responses. | User decision or bounded next action. |
 | Invalid reasoning/profile/executor | Do not delegate/review or substitute silently. | Select/materialize and record valid input. |
@@ -138,5 +135,6 @@ Do not cherry-pick, merge, rebase, or use transport history.
 | Cleanup mismatch | Do not force-delete another run's ref. | Compare-delete at recorded SHA after ownership check. |
 | Interrupted learning | Do not undo work or persist raw evidence. | Resume learning placement. |
 
-On resume, reread plan/checkpoint, inspect status, and revalidate identifiers before the
-named `NEXT_SAFE_ACTION`.
+On resume, reread plan/checkpoint, inspect status, and revalidate identifiers and scope
+before the named `NEXT_SAFE_ACTION`; do not repeat checks already proven against unchanged
+bytes.

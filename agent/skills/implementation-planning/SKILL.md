@@ -187,6 +187,8 @@ A good task has:
 Split tasks when:
 
 - one task would touch unrelated layers;
+- an interrupted task could not be resumed from a validated partial ref without
+  rediscovering or reimplementing unrelated work;
 - contract/schema changes need to land before implementation;
 - data migration or generated code must be verified separately;
 - UI, API, persistence, and tests are separable;
@@ -212,7 +214,9 @@ Prefer concrete, implementation-useful context:
 - test fixtures and smallest relevant test commands;
 - deployment, build, lint, or contract gates;
 - security, privacy, permissions, and data-retention constraints;
-- known pitfalls from current code.
+- known pitfalls from current code;
+- stable intermediate invariants and focused verification commands that let an
+  interrupted worker resume from validated existing work instead of restarting.
 
 Avoid generic context:
 

@@ -20,6 +20,9 @@ revmux_profile: <implementation-codex|explicit user override>
 revmux_executors: <exact resolved executors, or none before final-review preflight>
 baseline_status_identity: <concise status/index/content identity>
 worker: <agent ID/handle>
+worker_session: <persisted session ID/handle, or none>
+worker_ref: <validated transport ref @ SHA, or none>
+resume_count: <number for this task/correction>
 worker_outcome: <one concise result or error>
 tasks_total: <number selected>
 tasks_completed: <number passing in candidate>
@@ -43,7 +46,7 @@ NEXT_SAFE_ACTION: <exactly one safe next action>
 ```
 
 Refresh it before and after each worker, candidate integration, final revmux cycle,
-final integration, and authoritative commit transition. On resume, reread the plan and
-checkpoint, inspect status, and revalidate plan Base SHA, candidate SHA/ref, branch,
-index, baseline, transport refs, and any retained final-review archive before taking the
-single named `NEXT_SAFE_ACTION`.
+final integration, and authoritative commit transition. On resume, reread plan/checkpoint,
+inspect status, and revalidate Base SHA/ref, branch, index, baseline, persisted worker,
+transport refs, and retained review archive before the named `NEXT_SAFE_ACTION`. Prefer
+validated existing worker/ref over a fresh worker.

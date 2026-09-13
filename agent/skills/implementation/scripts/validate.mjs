@@ -84,7 +84,7 @@ const expected = {
   model: 'openai-codex/gpt-5.6-luna',
   tools: 'read, bash, edit, write, grep, find, ls', prompt_mode: 'replace',
   extensions: 'false', skills: 'implementation-agent-contract', persist_session: 'true',
-  output_transcript: 'false', max_turns: '80',
+  output_transcript: 'false', max_turns: '120',
 };
 for (const [key, value] of Object.entries(expected)) {
   if (actual[key] !== value) fail(`${workerPath} requires ${key}: ${value}; got ${actual[key] ?? '<missing>'}`);

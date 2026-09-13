@@ -14,7 +14,8 @@ repository.
 - Isolation: `worktree`; starting point: committed candidate `HEAD` at Candidate Base SHA
 - Plan path: `<plan path>`
 - Source-spec path: `<source-spec path>`
-- Attempt: `<initial | correction N | recovery restart N>`
+- Attempt: `<initial | correction N | resume N | recovery fallback N>`
+- Existing worker/session/ref: `<none, or validated identifiers being resumed>`
 - Worker reasoning: `<medium | high | xhigh>` (coordinator-selected; default `high`)
 - Existing baseline: `<complete status, index state, path list, and content identity; preserve byte-for-byte>`
 
@@ -114,9 +115,11 @@ failed, or unverifiable commands as such and use a failure result.
   required result.
 - If blocked, stop and report the exact blocker and one safe next action.
 
-For a recovery restart only, the packet may name one validated `pi-agent-*` recovery
-ref and permit restoring its path-limited binary delta with `git diff --binary
-<Candidate Base SHA>...<recovery-ref> | git apply`. Never cherry-pick or merge that ref.
+For a resume or recovery fallback, name the validated worker/session/worktree and one
+`pi-agent-*` ref. Prefer continuing it. If reconstruction is required, restore only its
+candidate-relative path-limited delta with `git diff --binary <Candidate Base SHA>
+<recovery-ref> | git apply`; never cherry-pick or merge. Rerun incomplete or affected
+checks, not expensive checks already proven against unchanged bytes.
 
 ## Worker result (exact schema)
 
